@@ -19,8 +19,6 @@ npm run build:pdf
 Add these in your CircleCI project settings:
 
 - `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_ACCOUNT_ID`
-- `CF_PAGES_PROJECT` (your Cloudflare Pages project name)
 
 ## Output
 

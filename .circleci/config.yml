@@ -22,7 +22,7 @@ jobs:
           name: Deploy to Cloudflare Pages
           command: |
             wrangler pages deploy . \
-              --project-name "$CF_PAGES_PROJECT" \
+              --project-name "resume-dhirajhq" \
               --branch "$CIRCLE_BRANCH"
 
 workflows:
