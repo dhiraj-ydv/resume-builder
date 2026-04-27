@@ -1,40 +1,33 @@
-# Resume HTML to PDF
+# Resume HTML on Cloudflare Pages (via CircleCI)
 
-This project generates a PDF resume from `resume.html` and saves it in `dist`.
+This repo is set up to build `dist/resume.pdf` in CircleCI and deploy the site to Cloudflare Pages.
 
-## Prerequisites
+## CI/CD flow
 
-- Node.js 20+ (recommended)
-- npm
-
-## Build PDF
-
-1. Install dependencies:
-
-```bash
-npm install
-```
-
-2. Install Playwright Chromium (first time or after clean setup):
-
-```bash
-npx playwright install chromium
-```
-
-3. Generate the PDF:
+1. Push to `main`.
+2. CircleCI runs `.circleci/config.yml`.
+3. It installs dependencies, installs Chromium, and runs:
 
 ```bash
 npm run build:pdf
 ```
 
+4. It deploys the repository to Cloudflare Pages using Wrangler.
+
+## Required CircleCI environment variables
+
+Add these in your CircleCI project settings:
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CF_PAGES_PROJECT` (your Cloudflare Pages project name)
+
 ## Output
 
-- Generated file: `dist/resume.pdf`
+- PDF generated during CI: `dist/resume.pdf`
 
 ## Download button behavior
 
-The download button in `resume.html` now points to:
+The button in `resume.html` downloads:
 
 - `./dist/resume.pdf`
-
-Make sure `dist/resume.pdf` exists before using the download button.

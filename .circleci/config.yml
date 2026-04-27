@@ -1,0 +1,35 @@
+version: 2.1
+
+jobs:
+  build-and-deploy:
+    docker:
+      - image: cimg/node:20.18
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command: npm install
+      - run:
+          name: Install Chromium for Playwright
+          command: npx playwright install --with-deps chromium
+      - run:
+          name: Build PDF
+          command: npm run build:pdf
+      - run:
+          name: Install Wrangler CLI
+          command: npm install -g wrangler
+      - run:
+          name: Deploy to Cloudflare Pages
+          command: |
+            wrangler pages deploy . \
+              --project-name "$CF_PAGES_PROJECT" \
+              --branch "$CIRCLE_BRANCH"
+
+workflows:
+  build-and-deploy-main:
+    jobs:
+      - build-and-deploy:
+          filters:
+            branches:
+              only:
+                - main
