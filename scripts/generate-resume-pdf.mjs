@@ -23,7 +23,7 @@ const server = http.createServer(async (req, res) => {
   try {
     const requestUrl = new URL(req.url || '/', `http://127.0.0.1:${port}`);
     let requestPath = decodeURIComponent(requestUrl.pathname);
-    if (requestPath === '/') requestPath = '/resume.html';
+    if (requestPath === '/') requestPath = '/index.html';
 
     const resolvedPath = path.resolve(rootDir, `.${requestPath}`);
     if (!resolvedPath.startsWith(rootDir)) {
@@ -55,7 +55,7 @@ try {
     deviceScaleFactor: 1,
   });
 
-  await page.goto(`http://127.0.0.1:${port}/resume.html`, {
+  await page.goto(`http://127.0.0.1:${port}/index.html`, {
     waitUntil: 'networkidle',
   });
   await page.emulateMedia({ media: 'print' });

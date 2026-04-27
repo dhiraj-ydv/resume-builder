@@ -26,6 +26,6 @@ Add these in your CircleCI project settings:
 
 ## Download button behavior
 
-The button in `resume.html` downloads:
+The button in `index.html` downloads:
 
 - `./dist/resume.pdf`
