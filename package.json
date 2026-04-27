@@ -1,0 +1,11 @@
+{
+  "name": "resume-html",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:pdf": "node scripts/generate-resume-pdf.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.55.0"
+  }
+}
