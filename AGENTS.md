@@ -57,6 +57,7 @@ Do not invent employers, dates, metrics, technologies, credentials, or outcomes.
 - `init` creates a workspace outside this repo
 - Default `resume-builder` opens the Tauri desktop window
 - `--browser` still serves the same UI on localhost
+- While running, MCP is at `http://127.0.0.1:4173/mcp` for external agents
 - Desktop installers for Windows and Linux come from the Desktop GitHub Actions workflow
 - Creating, editing, previewing, and exporting a resume works without touching app source
 - PDFs print cleanly to A4

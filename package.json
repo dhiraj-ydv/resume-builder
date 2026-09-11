@@ -34,7 +34,10 @@
     "node": ">=20"
   },
   "dependencies": {
-    "playwright": "^1.55.0"
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "marked": "^15.0.12",
+    "playwright": "^1.55.0",
+    "zod": "^4.6.2"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.8.5"

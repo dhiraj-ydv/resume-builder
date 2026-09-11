@@ -1,7 +1,15 @@
 import { mkdir, readFile, readdir, rm, writeFile, access } from 'node:fs/promises';
-import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { constants as fsConstants } from 'node:fs';
+import {
+  excerpt,
+  jsonResumeToMarkdown,
+  parseFrontmatter,
+  serializeProfileMarkdown,
+  serializeResumeMarkdown,
+  starterMarkdown,
+  starterProfileMarkdown,
+} from './markdown.mjs';
 
 export const SCHEMA_VERSION = 1;
 export const WORKSPACE_FILE = 'resume-builder.json';
@@ -30,19 +38,8 @@ export function emptyProfile() {
 }
 
 export function emptyResume(slug, title = '') {
-  return {
-    slug,
-    title: title || slug,
-    status: 'draft',
-    updated: monthStamp(),
-    summary: '',
-    tags: [],
-    template: 'classic',
-    skills: [{ name: 'Core skills', items: [] }],
-    experience: [],
-    projects: [],
-    education: [],
-  };
+  const markdown = starterMarkdown(title || slug);
+  return markdownToResume(markdown, slug);
 }
 
 export function slugify(value) {
@@ -84,9 +81,10 @@ export async function initWorkspace(targetDir) {
   await mkdir(root, { recursive: true });
   await mkdir(path.join(root, 'resumes'), { recursive: true });
   await mkdir(path.join(root, 'dist'), { recursive: true });
+  await mkdir(path.join(root, 'skills'), { recursive: true });
 
   const markerPath = path.join(root, WORKSPACE_FILE);
-  const profilePath = path.join(root, 'profile.json');
+  const profilePath = path.join(root, 'profile.md');
   const readmePath = path.join(root, 'README.md');
   const gitignorePath = path.join(root, '.gitignore');
 
@@ -98,8 +96,8 @@ export async function initWorkspace(targetDir) {
     });
   }
 
-  if (!(await exists(profilePath))) {
-    await writeJson(profilePath, emptyProfile());
+  if (!(await exists(profilePath)) && !(await exists(path.join(root, 'profile.json')))) {
+    await writeFile(profilePath, starterProfileMarkdown(), 'utf8');
   }
 
   if (!(await exists(readmePath))) {
@@ -107,28 +105,37 @@ export async function initWorkspace(targetDir) {
   }
 
   if (!(await exists(gitignorePath))) {
-    await writeFile(gitignorePath, '*.log\n.DS_Store\nThumbs.db\n', 'utf8');
-  }
-
-  if (!(await exists(path.join(root, '.git')))) {
-    const git = spawnSync('git', ['init'], { cwd: root, encoding: 'utf8' });
-    if (git.status !== 0) {
-      console.warn('Workspace created, but git init failed. You can run git init yourself.');
-    }
+    await writeFile(gitignorePath, '*.log\n.DS_Store\nThumbs.db\nsettings.json\n', 'utf8');
   }
 
   return findWorkspace(root);
 }
 
 export async function loadProfile(root) {
-  const file = path.join(root, 'profile.json');
-  if (!(await exists(file))) return emptyProfile();
-  return normalizeProfile(JSON.parse(await readFile(file, 'utf8')));
+  const mdFile = path.join(root, 'profile.md');
+  const jsonFile = path.join(root, 'profile.json');
+
+  if (await exists(mdFile)) {
+    return markdownToProfile(await readFile(mdFile, 'utf8'));
+  }
+
+  if (await exists(jsonFile)) {
+    const profile = markdownToProfile(serializeProfileMarkdown(normalizeProfile(JSON.parse(await readFile(jsonFile, 'utf8')))));
+    await writeFile(mdFile, profile.markdown, 'utf8');
+    return profile;
+  }
+
+  const profile = markdownToProfile(starterProfileMarkdown());
+  await writeFile(mdFile, profile.markdown, 'utf8');
+  return profile;
 }
 
-export async function saveProfile(root, profile) {
-  const next = normalizeProfile(profile);
-  await writeJson(path.join(root, 'profile.json'), next);
+export async function saveProfile(root, input) {
+  const markdown = typeof input?.markdown === 'string'
+    ? input.markdown
+    : serializeProfileMarkdown({ ...emptyProfile(), ...input });
+  const next = markdownToProfile(markdown);
+  await writeFile(path.join(root, 'profile.md'), next.markdown, 'utf8');
   return next;
 }
 
@@ -154,12 +161,22 @@ export async function listResumes(root) {
 
 export async function loadResume(root, slug) {
   assertSlug(slug);
-  const file = resumeFile(root, slug);
-  if (!(await exists(file))) {
-    throw new WorkspaceError(`Resume not found: ${slug}`, 404);
+  const mdFile = resumeMarkdownFile(root, slug);
+  const jsonFile = resumeJsonFile(root, slug);
+
+  if (await exists(mdFile)) {
+    const markdown = await readFile(mdFile, 'utf8');
+    return markdownToResume(markdown, slug);
   }
-  const payload = JSON.parse(await readFile(file, 'utf8'));
-  return normalizeResume(payload, slug);
+
+  if (await exists(jsonFile)) {
+    const payload = JSON.parse(await readFile(jsonFile, 'utf8'));
+    const markdown = jsonResumeToMarkdown({ ...payload, slug });
+    await writeFile(mdFile, markdown, 'utf8');
+    return markdownToResume(markdown, slug);
+  }
+
+  throw new WorkspaceError(`Resume not found: ${slug}`, 404);
 }
 
 export async function createResume(root, input) {
@@ -168,22 +185,35 @@ export async function createResume(root, input) {
   const slug = slugify(input.slug || title);
   assertSlug(slug);
 
-  const file = resumeFile(root, slug);
-  if (await exists(file)) {
+  const file = resumeMarkdownFile(root, slug);
+  if (await exists(file) || (await exists(resumeJsonFile(root, slug)))) {
     throw new WorkspaceError(`A resume with slug "${slug}" already exists.`, 409);
   }
 
   const resume = emptyResume(slug, title);
+  resume.updated = monthStamp();
+  resume.markdown = serializeResumeMarkdown(resume);
   await mkdir(path.dirname(file), { recursive: true });
-  await writeJson(file, resume);
+  await writeFile(file, resume.markdown, 'utf8');
   return resume;
 }
 
 export async function saveResume(root, slug, input) {
   assertSlug(slug);
-  const current = await loadResume(root, slug);
-  const next = normalizeResume({ ...current, ...input, slug, updated: monthStamp() }, slug);
-  await writeJson(resumeFile(root, slug), next);
+  await loadResume(root, slug);
+  const markdown = typeof input?.markdown === 'string'
+    ? input.markdown
+    : serializeResumeMarkdown({
+      title: input.title,
+      status: input.status,
+      tags: input.tags,
+      updated: monthStamp(),
+      body: input.body,
+    });
+  const next = markdownToResume(markdown, slug);
+  next.updated = monthStamp();
+  next.markdown = serializeResumeMarkdown(next);
+  await writeFile(resumeMarkdownFile(root, slug), next.markdown, 'utf8');
   return next;
 }
 
@@ -200,8 +230,55 @@ export async function deleteResume(root, slug) {
   }
 }
 
-function resumeFile(root, slug) {
+function resumeMarkdownFile(root, slug) {
+  return path.join(root, 'resumes', slug, 'resume.md');
+}
+
+function resumeJsonFile(root, slug) {
   return path.join(root, 'resumes', slug, 'resume.json');
+}
+
+function markdownToProfile(markdown) {
+  const { meta, body } = parseFrontmatter(markdown);
+  const profile = normalizeProfile({
+    name: meta.name,
+    headline: meta.headline,
+    email: meta.email,
+    phone: meta.phone,
+    location: meta.location,
+    website: meta.website,
+    linkedin: meta.linkedin,
+    github: meta.github,
+  });
+  profile.body = body;
+  profile.markdown = serializeProfileMarkdown(profile);
+  return profile;
+}
+
+function markdownToResume(markdown, slug) {
+  const { meta, body } = parseFrontmatter(markdown);
+  const tags = String(meta.tags || '')
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+  const status = ['draft', 'active', 'archived'].includes(meta.status) ? meta.status : 'draft';
+  return {
+    slug,
+    title: String(meta.title || slug),
+    status,
+    tags,
+    updated: String(meta.updated || monthStamp()),
+    body,
+    markdown: serializeResumeMarkdown({
+      title: meta.title || slug,
+      status,
+      tags,
+      updated: meta.updated || monthStamp(),
+      body,
+    }),
+    summary: excerpt(body),
+    template: 'classic',
+  };
 }
 
 function summarizeResume(resume) {
@@ -237,54 +314,6 @@ function normalizeProfile(input = {}) {
   return profile;
 }
 
-function normalizeResume(input = {}, slug) {
-  const resume = emptyResume(slug, input.title);
-  resume.title = String(input.title || slug);
-  resume.status = ['draft', 'active', 'archived'].includes(input.status) ? input.status : 'draft';
-  resume.updated = String(input.updated || monthStamp());
-  resume.summary = String(input.summary || '');
-  resume.tags = asStringArray(input.tags);
-  resume.template = input.template === 'classic' ? 'classic' : 'classic';
-  resume.skills = Array.isArray(input.skills)
-    ? input.skills.map((group) => ({
-        name: String(group?.name || 'Skills'),
-        items: asStringArray(group?.items),
-      }))
-    : resume.skills;
-  resume.experience = Array.isArray(input.experience)
-    ? input.experience.map((item) => ({
-        company: String(item?.company || ''),
-        role: String(item?.role || ''),
-        location: String(item?.location || ''),
-        start: String(item?.start || ''),
-        end: String(item?.end || ''),
-        bullets: asStringArray(item?.bullets),
-      }))
-    : [];
-  resume.projects = Array.isArray(input.projects)
-    ? input.projects.map((item) => ({
-        name: String(item?.name || ''),
-        url: String(item?.url || ''),
-        summary: String(item?.summary || ''),
-        bullets: asStringArray(item?.bullets),
-      }))
-    : [];
-  resume.education = Array.isArray(input.education)
-    ? input.education.map((item) => ({
-        school: String(item?.school || ''),
-        degree: String(item?.degree || ''),
-        year: String(item?.year || ''),
-        details: String(item?.details || ''),
-      }))
-    : [];
-  return resume;
-}
-
-function asStringArray(value) {
-  if (!Array.isArray(value)) return [];
-  return value.map((item) => String(item || '').trim()).filter(Boolean);
-}
-
 async function exists(filePath) {
   try {
     await access(filePath);
@@ -304,8 +333,11 @@ function dataRepoReadme() {
 
 This folder is **your resume data**, not the Resume Builder app.
 
-- \`profile.json\` — shared name, contact details, and links
-- \`resumes/<slug>/resume.json\` — each role-specific resume
+- \`profile.md\` — shared name, contact details, and links
+- \`memory.md\` — durable notes for the resume agent
+- \`skills/<slug>/SKILL.md\` — custom agent skills
+- \`resumes/<slug>/resume.md\` — each role-specific resume (Markdown)
+- MCP server (while the app is running): \`http://127.0.0.1:4173/mcp\`
 - Generated PDFs land in \`resumes/<slug>/dist/resume.pdf\` and \`dist/<slug>.pdf\`
 
 Edit everything in the local web UI:
@@ -314,6 +346,6 @@ Edit everything in the local web UI:
 resume-builder
 \`\`\`
 
-Keep this directory in its own git repo so your content stays separate from the app.
+This folder is your data, not the app. Git is optional; the app does not initialize a repository.
 `;
 }

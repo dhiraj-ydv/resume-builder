@@ -20,10 +20,6 @@ function displayUrl(value) {
   return String(value || '').replace(/^https?:\/\//i, '').replace(/\/$/, '');
 }
 
-function hasText(...values) {
-  return values.some((value) => String(value || '').trim());
-}
-
 function icon(name) {
   const icons = {
     mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>',
@@ -44,18 +40,7 @@ function contactLink(iconName, href, label) {
   return `<span class="contact-link">${inner}</span>`;
 }
 
-function section(title, body) {
-  if (!body) return '';
-  return `<section class="section"><h2 class="section-title">${esc(title)}</h2>${body}</section>`;
-}
-
-function bullets(items) {
-  const list = (items || []).map((item) => String(item || '').trim()).filter(Boolean);
-  if (!list.length) return '';
-  return `<ul class="bullets">${list.map((item) => `<li>${esc(item)}</li>`).join('')}</ul>`;
-}
-
-export function renderClassic(profile, resume) {
+export function renderClassic(profile, resume, bodyHtml = '') {
   const name = profile.name.trim() || 'Your name';
   const title = resume.title.trim() || 'Resume title';
   const contacts = [
@@ -67,58 +52,6 @@ export function renderClassic(profile, resume) {
     contactLink('github', safeUrl(profile.github), displayUrl(profile.github) || (profile.github ? 'GitHub' : '')),
     ...(profile.links || []).map((link) => contactLink('web', safeUrl(link.url), link.label || displayUrl(link.url))),
   ].filter(Boolean);
-
-  const skills = (resume.skills || []).filter((group) => (group.items || []).length);
-  const experience = (resume.experience || []).filter((item) => hasText(item.role, item.company, ...(item.bullets || [])));
-  const projects = (resume.projects || []).filter((item) => hasText(item.name, item.summary, ...(item.bullets || [])));
-  const education = (resume.education || []).filter((item) => hasText(item.school, item.degree, item.details));
-
-  const skillsHtml = skills.length
-    ? `<div class="skills-grid">${skills.map((group) => `
-        <div class="skills-column">
-          <h3>${esc(group.name || 'Skills')}</h3>
-          <ul class="skill-list">${group.items.map((item) => `<li class="skill-badge">${esc(item)}</li>`).join('')}</ul>
-        </div>`).join('')}</div>`
-    : '';
-
-  const experienceHtml = experience.length
-    ? experience.map((item) => {
-        const when = [item.start, item.end].filter(Boolean).join(' – ');
-        return `<article class="experience-item">
-          <div class="item-header">
-            <h4>${esc(item.role || item.company)}</h4>
-            <span>${esc(when)}</span>
-          </div>
-          <span class="item-sub">${esc([item.company, item.location].filter(Boolean).join(' · '))}</span>
-          ${bullets(item.bullets)}
-        </article>`;
-      }).join('')
-    : '';
-
-  const projectsHtml = projects.length
-    ? `<div class="projects-grid">${projects.map((item) => {
-        const heading = item.url
-          ? `<a href="${esc(safeUrl(item.url))}" target="_blank" rel="noreferrer">${esc(item.name || 'Project')}</a>`
-          : esc(item.name || 'Project');
-        return `<article class="project-item">
-          <div class="item-header"><h4>${heading}</h4></div>
-          ${item.summary ? `<p class="profile-text">${esc(item.summary)}</p>` : ''}
-          ${bullets(item.bullets)}
-        </article>`;
-      }).join('')}</div>`
-    : '';
-
-  const educationHtml = education.length
-    ? `<div class="education-list">${education.map((item) => `
-        <article class="education-item">
-          <div class="item-header">
-            <h4>${esc(item.school)}</h4>
-            <span>${esc(item.year)}</span>
-          </div>
-          <span class="item-sub">${esc(item.degree)}</span>
-          ${item.details ? `<p class="profile-text">${esc(item.details)}</p>` : ''}
-        </article>`).join('')}</div>`
-    : '';
 
   return `<!doctype html>
 <html lang="en">
@@ -141,11 +74,7 @@ export function renderClassic(profile, resume) {
         </div>
         ${contacts.length ? `<div class="contact-links">${contacts.join('')}</div>` : ''}
       </header>
-      ${section('Professional profile', resume.summary.trim() ? `<p class="profile-text">${esc(resume.summary)}</p>` : '')}
-      ${section('Skills', skillsHtml)}
-      ${section('Experience', experienceHtml)}
-      ${section('Projects', projectsHtml)}
-      ${section('Education', educationHtml)}
+      <div class="markdown-body">${bodyHtml || '<p class="profile-text">Start writing in Edit mode.</p>'}</div>
     </main>
   </div>
 </body>
@@ -223,33 +152,30 @@ header { margin-bottom: 16px; }
   background: linear-gradient(to right, #cbd5e1, transparent);
 }
 .profile-text { color: var(--ink-soft); font-size: 0.85rem; line-height: 1.5; }
-.skills-grid, .projects-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 28px; margin-top: 10px; }
-.skills-column h3 {
-  font-size: 0.85rem;
+.markdown-body { color: var(--ink-soft); font-size: 0.88rem; }
+.markdown-body h1, .markdown-body h2, .markdown-body h3 {
+  color: var(--ink);
+  margin: 1.1em 0 0.45em;
+}
+.markdown-body h2 {
+  font-size: 1.05rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin-bottom: 8px;
-  border-bottom: 2px solid var(--line-soft);
-  padding-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
-.skill-list { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
-.skill-badge {
-  background: var(--line-soft);
-  color: var(--ink-soft);
-  border: 1px solid #e2e8f0;
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 0.76rem;
-  font-weight: 500;
+.markdown-body h2::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  background: linear-gradient(to right, #cbd5e1, transparent);
 }
-.experience-item, .education-item { margin-bottom: 12px; }
-.item-header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-.item-header h4 { font-size: 0.92rem; font-weight: 700; }
-.item-header a { color: inherit; text-decoration: none; }
-.item-header span { font-size: 0.78rem; color: var(--ink-muted); font-weight: 600; }
-.item-sub { display: block; font-weight: 600; color: var(--ink-soft); font-size: 0.82rem; margin-bottom: 2px; }
-.bullets { margin: 4px 0 0 18px; color: var(--ink-soft); font-size: 0.85rem; }
-.bullets li { margin: 2px 0; }
+.markdown-body h3 { font-size: 0.95rem; }
+.markdown-body p, .markdown-body ul, .markdown-body ol { margin: 0 0 0.7em; }
+.markdown-body ul, .markdown-body ol { padding-left: 1.2em; }
+.markdown-body a { color: var(--primary); }
+.markdown-body strong { color: var(--ink); }
 @media print {
   @page { size: A4; margin: 5mm 8mm; }
   body { background: white; margin: 0; font-size: 11pt; line-height: 1.3; }

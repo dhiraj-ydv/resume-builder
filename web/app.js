@@ -1,16 +1,54 @@
 const app = document.querySelector('#app');
-const workspacePath = document.querySelector('#workspace-path');
 const saveStatus = document.querySelector('#save-status');
+
 const createDialog = document.querySelector('#create-dialog');
 const createForm = document.querySelector('#create-form');
 const createTitle = document.querySelector('#create-title');
 const createCancel = document.querySelector('#create-cancel');
+const skillDialog = document.querySelector('#skill-dialog');
+const skillForm = document.querySelector('#skill-form');
+const skillName = document.querySelector('#skill-name');
+const skillCancel = document.querySelector('#skill-cancel');
 
 let saveTimer = 0;
 let editorState = null;
 
-window.addEventListener('hashchange', render);
+window.addEventListener('hashchange', () => {
+  closeSettingsMenu();
+  render();
+});
+
+const settingsBtn = document.querySelector('#settings-btn');
+const settingsDropdown = document.querySelector('#settings-dropdown');
+settingsBtn.addEventListener('click', (event) => {
+  event.stopPropagation();
+  const open = settingsDropdown.hidden;
+  settingsDropdown.hidden = !open;
+  settingsBtn.setAttribute('aria-expanded', String(open));
+});
+settingsDropdown.addEventListener('click', () => closeSettingsMenu());
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('.settings-menu')) closeSettingsMenu();
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') closeSettingsMenu();
+});
+
+function closeSettingsMenu() {
+  settingsDropdown.hidden = true;
+  settingsBtn.setAttribute('aria-expanded', 'false');
+}
 createCancel.addEventListener('click', () => createDialog.close());
+skillCancel.addEventListener('click', () => skillDialog.close());
+skillForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const name = skillName.value.trim();
+  if (!name) return;
+  const skill = await api('/api/skills', { method: 'POST', body: JSON.stringify({ name }) });
+  skillDialog.close();
+  skillForm.reset();
+  location.hash = `#/skills/${skill.slug}`;
+});
 createForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const title = createTitle.value.trim();
@@ -21,20 +59,38 @@ createForm.addEventListener('submit', async (event) => {
   location.hash = `#/edit/${resume.slug}`;
 });
 
-try {
-  const workspace = await api('/api/workspace');
-  workspacePath.textContent = workspace.root;
-  workspacePath.title = workspace.root;
-} catch {
-  workspacePath.textContent = 'Workspace unavailable';
-}
-
 await render();
 
 async function render() {
   const route = parseRoute();
-  if (route.name === 'edit') {
-    await renderEditor(route.slug);
+  const backHome = document.querySelector('#back-home');
+  if (backHome) backHome.hidden = route.name === 'dashboard';
+  if (route.name === 'profile') {
+    await renderProfileEditor();
+    return;
+  }
+  if (route.name === 'skills') {
+    await renderSkills();
+    return;
+  }
+  if (route.name === 'skill') {
+    await renderSkillEditor(route.slug);
+    return;
+  }
+  if (route.name === 'memory') {
+    await renderMemory();
+    return;
+  }
+  if (route.name === 'docs') {
+    await renderDocs();
+    return;
+  }
+  if (route.name === 'vault') {
+    await renderVault();
+    return;
+  }
+  if (route.name === 'edit' || route.name === 'preview') {
+    await renderEditor(route.slug, route.name);
     return;
   }
   await renderDashboard();
@@ -42,64 +98,57 @@ async function render() {
 
 function parseRoute() {
   const hash = location.hash.replace(/^#/, '') || '/';
-  const edit = hash.match(/^\/edit\/([^/]+)\/?$/);
-  if (edit) return { name: 'edit', slug: decodeURIComponent(edit[1]) };
+  if (hash === '/profile' || hash === '/profile/edit' || hash === '/profile/preview') {
+    return { name: 'profile' };
+  }
+  if (hash === '/skills') return { name: 'skills' };
+  if (hash === '/memory') return { name: 'memory' };
+  if (hash === '/vault') return { name: 'vault' };
+  if (hash === '/docs' || hash.startsWith('/docs/') || hash === '/settings' || hash === '/mcp') {
+    return { name: 'docs' };
+  }
+  const skill = hash.match(/^\/skills\/([^/]+)\/?$/);
+  if (skill) return { name: 'skill', slug: decodeURIComponent(skill[1]) };
+  const edit = hash.match(/^\/(edit|preview)\/([^/]+)\/?$/);
+  if (edit) return { name: edit[1], slug: decodeURIComponent(edit[2]) };
   return { name: 'dashboard' };
 }
 
 async function renderDashboard() {
   editorState = null;
   saveStatus.hidden = true;
-  const [{ resumes }, profile] = await Promise.all([
-    api('/api/resumes'),
-    api('/api/profile'),
-  ]);
+  const { resumes } = await api('/api/resumes');
 
   app.innerHTML = `
     <section class="hero">
       <div>
         <p class="eyebrow">Local workspace</p>
         <h1>Your resumes</h1>
-        <p class="lede">Create role-specific resumes from one profile. Data stays in your workspace repo, not in the app.</p>
+        <p class="lede">Everything is Markdown. Use Edit to write, Preview to see the page.</p>
       </div>
-      <button class="primary" id="new-resume">New resume</button>
-    </section>
-
-    <section class="profile-card">
-      <div class="row">
-        <h2>Profile</h2>
-        <span class="muted">Shared across every resume</span>
+      <div class="actions">
+        <button class="primary" id="new-resume">New resume</button>
       </div>
-      <form id="profile-form" class="profile-grid">
-        ${field('Name', 'name', profile.name)}
-        ${field('Headline', 'headline', profile.headline)}
-        ${field('Email', 'email', profile.email)}
-        ${field('Phone', 'phone', profile.phone)}
-        ${field('Location', 'location', profile.location)}
-        ${field('Website', 'website', profile.website)}
-        ${field('LinkedIn', 'linkedin', profile.linkedin)}
-        ${field('GitHub', 'github', profile.github)}
-      </form>
     </section>
 
     <section class="toolbar">
       <span class="muted">${resumes.length} ${resumes.length === 1 ? 'resume' : 'resumes'}</span>
       <label class="search">
         <span class="sr-only">Search</span>
-        <input id="resume-search" type="search" placeholder="Search role, skill, or title…" />
+        <input id="resume-search" type="search" placeholder="Search role or title…" />
       </label>
     </section>
-    <section id="resume-grid" class="resume-grid"></section>
+    <section id="resume-grid" class="resume-list-wrap"></section>
   `;
 
   const grid = app.querySelector('#resume-grid');
   const search = app.querySelector('#resume-search');
   const draw = (items) => {
     if (!items.length) {
-      grid.innerHTML = `<div class="empty-state"><h2>No resumes yet</h2><p>Create a resume for a target role. Your profile is reused; the resume content can be tailored.</p></div>`;
+      grid.innerHTML = `<div class="empty-state"><h2>No resumes yet</h2><p>Create a resume, then write it in Markdown. Preview renders the designed page.</p></div>`;
       return;
     }
-    grid.innerHTML = items.map(cardHtml).join('');
+    grid.innerHTML = `<ul class="resume-list">${items.map(listItemHtml).join('')}</ul>`;
   };
   draw(resumes);
   search.addEventListener('input', () => {
@@ -133,92 +182,367 @@ async function renderDashboard() {
     }
   });
 
-  app.querySelector('#profile-form').addEventListener('input', () => {
-    const data = Object.fromEntries(new FormData(app.querySelector('#profile-form')));
+}
+
+function listItemHtml(resume) {
+  return `
+    <li class="resume-row">
+      <a class="resume-title" href="#/edit/${encodeURIComponent(resume.slug)}">${escapeHtml(resume.title)}</a>
+      <span class="badge">${escapeHtml(resume.status || 'draft')}</span>
+      <span class="muted">${resume.updated ? escapeHtml(resume.updated) : ''}</span>
+      <div class="row-actions">
+        <a class="secondary" href="#/edit/${encodeURIComponent(resume.slug)}">Edit</a>
+        <a class="secondary" href="#/preview/${encodeURIComponent(resume.slug)}">Preview</a>
+        <button class="secondary" data-action="pdf" data-slug="${escapeHtml(resume.slug)}">PDF</button>
+        <button class="danger" data-action="delete" data-slug="${escapeHtml(resume.slug)}">Delete</button>
+      </div>
+    </li>
+  `;
+}
+
+async function renderSkills() {
+  editorState = null;
+  saveStatus.hidden = true;
+  const { skills } = await api('/api/skills');
+  app.innerHTML = `
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Agent</p>
+        <h1>Skills</h1>
+        <p class="lede">Built-in skills ship with the app. Custom skills live in this workspace. Agents load them through the MCP server.</p>
+      </div>
+      <button class="primary" id="new-skill">New skill</button>
+    </section>
+    <ul class="resume-list">
+      ${skills.map((skill) => `
+        <li class="resume-row">
+          <a class="resume-title" href="#/skills/${encodeURIComponent(skill.slug)}">${escapeHtml(skill.name)}</a>
+          <span class="badge">${escapeHtml(skill.source)}${skill.enabled === false ? ' · off' : ''}</span>
+          <span class="muted">${escapeHtml(skill.description || '')}</span>
+          <div class="row-actions">
+            <button class="secondary" data-action="toggle-skill" data-slug="${escapeHtml(skill.slug)}" data-enabled="${skill.enabled !== false}">${skill.enabled === false ? 'Enable' : 'Disable'}</button>
+            <a class="secondary" href="#/skills/${encodeURIComponent(skill.slug)}">Open</a>
+            ${skill.source === 'user' ? `<button class="danger" data-action="delete-skill" data-slug="${escapeHtml(skill.slug)}">Delete</button>` : ''}
+          </div>
+        </li>
+      `).join('')}
+    </ul>
+  `;
+  app.querySelector('#new-skill').addEventListener('click', () => {
+    skillName.value = '';
+    skillDialog.showModal();
+    skillName.focus();
+  });
+  app.querySelector('.resume-list').addEventListener('click', async (event) => {
+    const toggle = event.target.closest('[data-action=toggle-skill]');
+    if (toggle) {
+      const enabled = toggle.dataset.enabled !== 'true';
+      await api(`/api/skills/${toggle.dataset.slug}/enabled`, {
+        method: 'PUT',
+        body: JSON.stringify({ enabled }),
+      });
+      await renderSkills();
+      return;
+    }
+    const remove = event.target.closest('[data-action=delete-skill]');
+    if (!remove) return;
+    if (!confirm(`Delete skill ${remove.dataset.slug}?`)) return;
+    await api(`/api/skills/${remove.dataset.slug}`, { method: 'DELETE' });
+    await renderSkills();
+  });
+}
+
+async function renderSkillEditor(slug) {
+  const skill = await api(`/api/skills/${slug}`);
+  editorState = { kind: 'skill', slug, markdown: skill.markdown, source: skill.source };
+  saveStatus.hidden = skill.source === 'builtin';
+  app.innerHTML = `
+    <section class="doc">
+      <div class="doc-toolbar">
+        <a class="ghost" href="#/skills">← Skills</a>
+        <span class="badge">${escapeHtml(skill.source)}${skill.enabled === false ? ' · off' : ''}</span>
+        <button class="secondary" id="toggle-skill">${skill.enabled === false ? 'Enable' : 'Disable'}</button>
+      </div>
+      <textarea class="md-editor" id="markdown" ${skill.source === 'builtin' ? 'readonly' : ''} spellcheck="true">${escapeHtml(skill.markdown)}</textarea>
+    </section>
+  `;
+  const editor = app.querySelector('#markdown');
+  if (skill.source !== 'builtin') {
+    editor.addEventListener('input', () => {
+      editorState.markdown = editor.value;
+      queueSave(async () => {
+        await api(`/api/skills/${slug}`, { method: 'PUT', body: JSON.stringify({ markdown: editorState.markdown }) });
+        saveStatus.textContent = 'Saved';
+      });
+    });
+  }
+  editor.focus();
+  app.querySelector('#toggle-skill').addEventListener('click', async () => {
+    await api(`/api/skills/${slug}/enabled`, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled: skill.enabled === false }),
+    });
+    await renderSkillEditor(slug);
+  });
+}
+
+async function renderMemory() {
+  const memory = await api('/api/memory');
+  editorState = { kind: 'memory', markdown: memory.markdown };
+  saveStatus.hidden = false;
+  app.innerHTML = `
+    <section class="doc">
+      <textarea class="md-editor" id="markdown" spellcheck="true" aria-label="Memory Markdown">${escapeHtml(memory.markdown)}</textarea>
+    </section>
+  `;
+  const editor = app.querySelector('#markdown');
+  editor.addEventListener('input', () => {
+    editorState.markdown = editor.value;
     queueSave(async () => {
-      await api('/api/profile', { method: 'PUT', body: JSON.stringify(data) });
+      await api('/api/memory', { method: 'PUT', body: JSON.stringify({ markdown: editorState.markdown }) });
+      saveStatus.textContent = 'Saved';
+    });
+  });
+  editor.focus();
+}
+
+async function renderVault() {
+  editorState = null;
+  saveStatus.hidden = true;
+  const workspace = await api('/api/workspace');
+  const recent = (workspace.recentVaults || []).filter((item) => item && item !== workspace.root);
+  app.innerHTML = `
+    <section class="doc">
+      <form id="vault-form" class="empty-state">
+        <h2>Vault</h2>
+        <p class="muted">Your resumes live in a vault folder, not in the app install. The default vault is used when you run <code>resume-builder</code> without <code>--dir</code>.</p>
+        <p><strong>Current:</strong> <code>${escapeHtml(workspace.root)}</code></p>
+        <p><strong>Default:</strong> <code>${escapeHtml(workspace.defaultVault || workspace.root)}</code></p>
+        <label class="field"><span>Vault path</span><input name="root" value="${escapeHtml(workspace.root)}" required /></label>
+        <div class="actions">
+          <button class="primary" type="submit" data-mode="switch">Switch vault</button>
+          <button class="secondary" type="submit" data-mode="init">Create vault here</button>
+        </div>
+        ${recent.length ? `<h3>Recent</h3><ul class="resume-list">${recent.map((item) => `
+          <li class="resume-row">
+            <span class="resume-title">${escapeHtml(item)}</span>
+            <div class="row-actions">
+              <button type="button" class="secondary" data-recent="${escapeHtml(item)}">Use</button>
+            </div>
+          </li>
+        `).join('')}</ul>` : ''}
+      </form>
+    </section>
+  `;
+  const form = app.querySelector('#vault-form');
+  const input = form.querySelector('input[name=root]');
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const mode = event.submitter?.dataset.mode || 'switch';
+    try {
+      await api('/api/workspace', {
+        method: 'PUT',
+        body: JSON.stringify({
+          root: input.value.trim(),
+          init: mode === 'init',
+          setDefault: true,
+        }),
+      });
+      location.hash = '#/';
+      await render();
+    } catch (error) {
+      saveStatus.hidden = false;
+      saveStatus.textContent = error.message;
+    }
+  });
+  form.querySelectorAll('[data-recent]').forEach((button) => {
+    button.addEventListener('click', () => {
+      input.value = button.dataset.recent;
+      form.requestSubmit(form.querySelector('[data-mode=switch]'));
     });
   });
 }
 
-function cardHtml(resume) {
-  const tags = (resume.tags || []).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('');
-  return `
-    <article class="resume-card">
-      <div class="card-topline">
-        <span class="badge">${escapeHtml(resume.status || 'draft')}</span>
-        <span class="muted">${resume.updated ? `Updated ${escapeHtml(resume.updated)}` : ''}</span>
-      </div>
-      <h2>${escapeHtml(resume.title)}</h2>
-      <p class="summary">${escapeHtml(resume.summary || 'No summary yet.')}</p>
-      <div class="tags">${tags}</div>
-      <div class="actions">
-        <a class="primary" href="#/edit/${encodeURIComponent(resume.slug)}">Edit</a>
-        <a class="secondary" href="/preview/${encodeURIComponent(resume.slug)}" target="_blank" rel="noreferrer">Preview</a>
-        <button class="secondary" data-action="pdf" data-slug="${escapeHtml(resume.slug)}">PDF</button>
-        <button class="danger" data-action="delete" data-slug="${escapeHtml(resume.slug)}">Delete</button>
-      </div>
+async function renderDocs() {
+  editorState = null;
+  saveStatus.hidden = true;
+  const info = await api('/api/mcp');
+  const snippet = JSON.stringify(info.generic, null, 2);
+  app.innerHTML = `
+    <article class="docs-page">
+      <header class="docs-hero">
+        <p class="eyebrow">Guide</p>
+        <h1>Read docs</h1>
+        <p class="lede">How this local resume app works: data, Markdown, skills, memory, and connecting your own agents over MCP.</p>
+      </header>
+      <nav class="docs-toc">
+        <a href="#/docs/overview">Overview</a>
+        <a href="#/docs/install">Install and run</a>
+        <a href="#/docs/workspace">Workspace</a>
+        <a href="#/docs/resumes">Resumes</a>
+        <a href="#/docs/profile">Profile</a>
+        <a href="#/docs/skills">Skills</a>
+        <a href="#/docs/memory">Memory</a>
+        <a href="#/docs/mcp">MCP</a>
+      </nav>
+
+      <section class="docs-section" id="docs-overview">
+        <h2>Overview</h2>
+        <p>Resume Builder is a local app. It does not run an LLM. You write Markdown in the UI, or you point Grok, Cursor, Codex, Gemini, or another agent at this process over MCP.</p>
+        <p>The product (this install) is separate from your data. Resumes live in a workspace folder you create with <code>resume-builder init</code>.</p>
+      </section>
+
+      <section class="docs-section" id="docs-install">
+        <h2>Install and run</h2>
+        <p>Node.js 20+ is required. You do not need to clone the repo.</p>
+        <pre>npx github:dhiraj-ydv/resume-builder install
+resume-builder init $HOME/Documents/my-resumes
+resume-builder --dir $HOME/Documents/my-resumes</pre>
+        <ul>
+          <li><code>resume-builder</code> opens the desktop window by default.</li>
+          <li><code>resume-builder --browser</code> opens the same UI in a web browser.</li>
+          <li><code>resume-builder serve</code> starts the server only.</li>
+          <li><code>resume-builder update</code> reinstalls from GitHub.</li>
+          <li><code>resume-builder uninstall</code> removes the app, not your workspace.</li>
+        </ul>
+        <p>The UI is at <code>http://127.0.0.1:4173/</code> while the app is running.</p>
+      </section>
+
+      <section class="docs-section" id="docs-workspace">
+        <h2>Workspace</h2>
+        <p>Open <strong>Vault</strong> from the settings gear to see the path or change the default vault. Typical layout:</p>
+        <pre>profile.md
+memory.md
+skills/disabled.json
+skills/&lt;slug&gt;/SKILL.md
+resumes/&lt;slug&gt;/resume.md
+resumes/&lt;slug&gt;/dist/resume.pdf</pre>
+        <p>Do not put personal resume data in the app install. Git in the vault is optional and not created automatically.</p>
+      </section>
+
+      <section class="docs-section" id="docs-resumes">
+        <h2>Resumes</h2>
+        <p>The home page is a list. Create a resume, then use <strong>Edit</strong> and <strong>Preview</strong>.</p>
+        <ul>
+          <li>Edit is the Markdown file, including YAML frontmatter (<code>title</code>, <code>status</code>, <code>tags</code>).</li>
+          <li>Preview renders the designed page.</li>
+          <li>PDF prints that preview to A4.</li>
+          <li>Changes autosave.</li>
+        </ul>
+        <p>The header <strong>← All resumes</strong> link appears on resume, profile, skills, memory, and docs pages — not on the home list.</p>
+      </section>
+
+      <section class="docs-section" id="docs-profile">
+        <h2>Profile</h2>
+        <p>Shared identity is <code>profile.md</code>. Open it from the settings gear. It is edit-only Markdown (name, email, and links in the frontmatter). Preview uses this header on every resume.</p>
+      </section>
+
+      <section class="docs-section" id="docs-skills">
+        <h2>Skills</h2>
+        <p>Skills are Markdown instructions agents can follow. Built-in skills ship with the app (research, impact writer, ATS optimizer, critic). You can create your own; those files live in the workspace.</p>
+        <ul>
+          <li>Enable or disable any skill. Disabled skills stay in the list but are hidden from MCP <code>list_skills</code>.</li>
+          <li>Built-in skills cannot be edited or deleted. Duplicate the idea as a custom skill if you need to change the text.</li>
+        </ul>
+      </section>
+
+      <section class="docs-section" id="docs-memory">
+        <h2>Memory</h2>
+        <p><code>memory.md</code> is durable notes for agents: facts, target roles, tone. Edit it from the settings gear. Agents can read and append through MCP (<code>get_memory</code>, <code>write_memory</code>, <code>append_memory</code>).</p>
+      </section>
+
+      <section class="docs-section" id="docs-mcp">
+        <h2>MCP</h2>
+        <p>While the app is running it hosts an MCP server in this process. Point your agent at:</p>
+        <p><code>${escapeHtml(info.url)}</code></p>
+        <p>Example config:</p>
+        <pre>${escapeHtml(snippet)}</pre>
+        <p>Tools include list/get/write for resumes, profile, skills, and memory, plus create resume, enable-aware skill listing, and PDF-related files on disk after you export.</p>
+      </section>
     </article>
   `;
+  const hash = location.hash.replace(/^#/, '');
+  const key = hash === '/mcp' ? 'mcp' : hash.replace(/^\/docs\/?/, '');
+  const target = document.getElementById(key ? `docs-${key}` : 'docs-overview');
+  if (target && key) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-async function renderEditor(slug) {
-  const [profile, resume] = await Promise.all([
-    api('/api/profile'),
-    api(`/api/resumes/${slug}`),
-  ]);
-  editorState = { profile, resume };
-  paintEditor();
+async function renderProfileEditor() {
+  if (!editorState || editorState.kind !== 'profile') {
+    const profile = await api('/api/profile');
+    editorState = { kind: 'profile', markdown: profile.markdown };
+  }
+  saveStatus.hidden = false;
+
+  app.innerHTML = `
+    <section class="doc">
+      <textarea class="md-editor" id="markdown" spellcheck="true" aria-label="Profile Markdown">${escapeHtml(editorState.markdown)}</textarea>
+    </section>
+  `;
+
+  const editor = app.querySelector('#markdown');
+  if (editor) {
+    editor.addEventListener('input', () => {
+      editorState.markdown = editor.value;
+      queueSave(saveProfileEditor);
+    });
+    editor.focus();
+  }
 }
 
-function paintEditor() {
+async function saveProfileEditor() {
+  if (!editorState || editorState.kind !== 'profile') return;
+  saveStatus.textContent = 'Saving…';
+  const saved = await api('/api/profile', {
+    method: 'PUT',
+    body: JSON.stringify({ markdown: editorState.markdown }),
+  });
+  editorState.markdown = saved.markdown;
+  saveStatus.textContent = 'Saved';
+}
+
+async function renderEditor(slug, mode) {
+  if (editorState?.kind === 'resume' && editorState.resume.slug === slug) {
+    if (mode === 'preview') await saveEditor();
+  } else {
+    const resume = await api(`/api/resumes/${slug}`);
+    editorState = { kind: 'resume', resume };
+  }
+  paintEditor(mode);
+}
+
+function paintEditor(mode) {
   if (!editorState) return;
   const { resume } = editorState;
   const slug = resume.slug;
   saveStatus.hidden = false;
 
   app.innerHTML = `
-    <div class="editor">
-      <form id="editor-form" class="editor-form">
-        <div class="row">
-          <a class="ghost" href="#/">← All resumes</a>
-          <div class="actions">
-            <button type="button" class="secondary" id="export-pdf">Download PDF</button>
-          </div>
+    <section class="doc">
+      <div class="doc-toolbar">
+        <div class="mode-switch" role="tablist">
+          <a class="mode${mode === 'edit' ? ' active' : ''}" href="#/edit/${encodeURIComponent(slug)}">Edit</a>
+          <a class="mode${mode === 'preview' ? ' active' : ''}" href="#/preview/${encodeURIComponent(slug)}">Preview</a>
         </div>
-        <h1>${escapeHtml(resume.title)}</h1>
-        <div class="form-grid">
-          ${field('Resume title', 'title', resume.title)}
-          ${selectField('Status', 'status', resume.status, ['draft', 'active', 'archived'])}
-          ${field('Tags', 'tags', (resume.tags || []).join(', '), 'Comma-separated', true)}
-          ${areaField('Summary', 'summary', resume.summary, true)}
-        </div>
-        ${renderSkillBlocks(resume.skills)}
-        ${renderExperienceBlocks(resume.experience)}
-        ${renderProjectBlocks(resume.projects)}
-        ${renderEducationBlocks(resume.education)}
-      </form>
-      <iframe class="preview-frame" id="preview" title="Resume preview" src="/preview/${encodeURIComponent(slug)}"></iframe>
-    </div>
+        <button type="button" class="secondary" id="export-pdf">Download PDF</button>
+      </div>
+      ${mode === 'edit' ? `
+        <textarea class="md-editor" id="markdown" spellcheck="true" aria-label="Resume Markdown">${escapeHtml(resume.markdown)}</textarea>
+      ` : `
+        <iframe class="preview-frame" id="preview" title="Resume preview" src="/preview/${encodeURIComponent(slug)}?t=${Date.now()}"></iframe>
+      `}
+    </section>
   `;
 
-  const form = app.querySelector('#editor-form');
-  form.addEventListener('input', () => {
-    readEditorForm(form);
-    queueSave(async () => {
-      await saveEditor();
-      refreshPreview();
+  const editor = app.querySelector('#markdown');
+  if (editor) {
+    editor.addEventListener('input', () => {
+      editorState.resume.markdown = editor.value;
+      queueSave(saveEditor);
     });
-  });
-  form.addEventListener('click', async (event) => {
-    const button = event.target.closest('[data-list-action]');
-    if (!button) return;
-    event.preventDefault();
-    readEditorForm(form);
-    mutateList(button.dataset.list, button.dataset.listAction, Number(button.dataset.index));
-    await saveEditor();
-    paintEditor();
-  });
+    editor.focus();
+  }
+
   app.querySelector('#export-pdf').addEventListener('click', async () => {
     await saveEditor();
     await api(`/api/resumes/${slug}/pdf`, { method: 'POST' });
@@ -226,159 +550,15 @@ function paintEditor() {
   });
 }
 
-function renderSkillBlocks(skills) {
-  const items = skills || [];
-  return `<section class="block">
-    <div class="row"><h3>Skills</h3><button type="button" class="secondary" data-list="skills" data-list-action="add">Add group</button></div>
-    ${items.map((group, index) => `
-      <div class="item-card">
-        ${field('Group name', `skills.${index}.name`, group.name)}
-        ${areaField('Items (one per line)', `skills.${index}.items`, (group.items || []).join('\n'))}
-        <div class="item-toolbar">
-          <button type="button" class="ghost" data-list="skills" data-list-action="up" data-index="${index}">Up</button>
-          <button type="button" class="ghost" data-list="skills" data-list-action="down" data-index="${index}">Down</button>
-          <button type="button" class="danger" data-list="skills" data-list-action="remove" data-index="${index}">Remove</button>
-        </div>
-      </div>
-    `).join('')}
-  </section>`;
-}
-
-function renderExperienceBlocks(experience) {
-  const items = experience || [];
-  return `<section class="block">
-    <div class="row"><h3>Experience</h3><button type="button" class="secondary" data-list="experience" data-list-action="add">Add role</button></div>
-    ${items.map((item, index) => `
-      <div class="item-card">
-        <div class="form-grid">
-          ${field('Role', `experience.${index}.role`, item.role)}
-          ${field('Company', `experience.${index}.company`, item.company)}
-          ${field('Start', `experience.${index}.start`, item.start)}
-          ${field('End', `experience.${index}.end`, item.end)}
-          ${field('Location', `experience.${index}.location`, item.location, '', true)}
-          ${areaField('Bullets (one per line)', `experience.${index}.bullets`, (item.bullets || []).join('\n'), true)}
-        </div>
-        <div class="item-toolbar">
-          <button type="button" class="ghost" data-list="experience" data-list-action="up" data-index="${index}">Up</button>
-          <button type="button" class="ghost" data-list="experience" data-list-action="down" data-index="${index}">Down</button>
-          <button type="button" class="danger" data-list="experience" data-list-action="remove" data-index="${index}">Remove</button>
-        </div>
-      </div>
-    `).join('')}
-  </section>`;
-}
-
-function renderProjectBlocks(projects) {
-  const items = projects || [];
-  return `<section class="block">
-    <div class="row"><h3>Projects</h3><button type="button" class="secondary" data-list="projects" data-list-action="add">Add project</button></div>
-    ${items.map((item, index) => `
-      <div class="item-card">
-        <div class="form-grid">
-          ${field('Name', `projects.${index}.name`, item.name)}
-          ${field('URL', `projects.${index}.url`, item.url)}
-          ${areaField('Summary', `projects.${index}.summary`, item.summary, true)}
-          ${areaField('Bullets (one per line)', `projects.${index}.bullets`, (item.bullets || []).join('\n'), true)}
-        </div>
-        <div class="item-toolbar">
-          <button type="button" class="ghost" data-list="projects" data-list-action="up" data-index="${index}">Up</button>
-          <button type="button" class="ghost" data-list="projects" data-list-action="down" data-index="${index}">Down</button>
-          <button type="button" class="danger" data-list="projects" data-list-action="remove" data-index="${index}">Remove</button>
-        </div>
-      </div>
-    `).join('')}
-  </section>`;
-}
-
-function renderEducationBlocks(education) {
-  const items = education || [];
-  return `<section class="block">
-    <div class="row"><h3>Education</h3><button type="button" class="secondary" data-list="education" data-list-action="add">Add education</button></div>
-    ${items.map((item, index) => `
-      <div class="item-card">
-        <div class="form-grid">
-          ${field('School', `education.${index}.school`, item.school)}
-          ${field('Degree', `education.${index}.degree`, item.degree)}
-          ${field('Year', `education.${index}.year`, item.year)}
-          ${areaField('Details', `education.${index}.details`, item.details, true)}
-        </div>
-        <div class="item-toolbar">
-          <button type="button" class="ghost" data-list="education" data-list-action="up" data-index="${index}">Up</button>
-          <button type="button" class="ghost" data-list="education" data-list-action="down" data-index="${index}">Down</button>
-          <button type="button" class="danger" data-list="education" data-list-action="remove" data-index="${index}">Remove</button>
-        </div>
-      </div>
-    `).join('')}
-  </section>`;
-}
-
-function mutateList(listName, action, index) {
-  if (!editorState) return;
-  const list = editorState.resume[listName] || [];
-  const blanks = {
-    skills: { name: 'Skills', items: [] },
-    experience: { company: '', role: '', location: '', start: '', end: '', bullets: [] },
-    projects: { name: '', url: '', summary: '', bullets: [] },
-    education: { school: '', degree: '', year: '', details: '' },
-  };
-  if (action === 'add') list.push(structuredClone(blanks[listName]));
-  if (action === 'remove') list.splice(index, 1);
-  if (action === 'up' && index > 0) [list[index - 1], list[index]] = [list[index], list[index - 1]];
-  if (action === 'down' && index < list.length - 1) [list[index + 1], list[index]] = [list[index], list[index + 1]];
-  editorState.resume[listName] = list;
-}
-
-function readEditorForm(form) {
-  if (!editorState) return;
-  const resume = editorState.resume;
-  const data = Object.fromEntries(new FormData(form));
-  resume.title = data.title || resume.title;
-  resume.status = data.status || resume.status;
-  resume.tags = splitList(data.tags, ',');
-  resume.summary = data.summary || '';
-  resume.skills = (resume.skills || []).map((group, index) => ({
-    name: data[`skills.${index}.name`] || group.name,
-    items: splitList(data[`skills.${index}.items`], '\n'),
-  }));
-  resume.experience = (resume.experience || []).map((item, index) => ({
-    ...item,
-    role: data[`experience.${index}.role`] || '',
-    company: data[`experience.${index}.company`] || '',
-    start: data[`experience.${index}.start`] || '',
-    end: data[`experience.${index}.end`] || '',
-    location: data[`experience.${index}.location`] || '',
-    bullets: splitList(data[`experience.${index}.bullets`], '\n'),
-  }));
-  resume.projects = (resume.projects || []).map((item, index) => ({
-    ...item,
-    name: data[`projects.${index}.name`] || '',
-    url: data[`projects.${index}.url`] || '',
-    summary: data[`projects.${index}.summary`] || '',
-    bullets: splitList(data[`projects.${index}.bullets`], '\n'),
-  }));
-  resume.education = (resume.education || []).map((item, index) => ({
-    ...item,
-    school: data[`education.${index}.school`] || '',
-    degree: data[`education.${index}.degree`] || '',
-    year: data[`education.${index}.year`] || '',
-    details: data[`education.${index}.details`] || '',
-  }));
-}
-
 async function saveEditor() {
   if (!editorState) return;
   saveStatus.textContent = 'Saving…';
-  await api(`/api/resumes/${editorState.resume.slug}`, {
+  const saved = await api(`/api/resumes/${editorState.resume.slug}`, {
     method: 'PUT',
-    body: JSON.stringify(editorState.resume),
+    body: JSON.stringify({ markdown: editorState.resume.markdown }),
   });
+  editorState.resume = saved;
   saveStatus.textContent = 'Saved';
-}
-
-function refreshPreview() {
-  const frame = document.querySelector('#preview');
-  if (!frame || !editorState) return;
-  frame.src = `/preview/${encodeURIComponent(editorState.resume.slug)}?t=${Date.now()}`;
 }
 
 function queueSave(fn) {
@@ -388,23 +568,6 @@ function queueSave(fn) {
   saveTimer = setTimeout(() => fn().catch((error) => {
     saveStatus.textContent = error.message;
   }), 400);
-}
-
-function field(label, name, value = '', placeholder = '', span2 = false) {
-  return `<label class="field${span2 ? ' span-2' : ''}"><span>${escapeHtml(label)}</span><input name="${escapeHtml(name)}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" /></label>`;
-}
-
-function areaField(label, name, value = '', span2 = false) {
-  return `<label class="field${span2 ? ' span-2' : ''}"><span>${escapeHtml(label)}</span><textarea name="${escapeHtml(name)}">${escapeHtml(value)}</textarea></label>`;
-}
-
-function selectField(label, name, value, options) {
-  const opts = options.map((option) => `<option value="${option}" ${option === value ? 'selected' : ''}>${option}</option>`).join('');
-  return `<label class="field"><span>${escapeHtml(label)}</span><select name="${escapeHtml(name)}">${opts}</select></label>`;
-}
-
-function splitList(value, delimiter) {
-  return String(value || '').split(delimiter).map((item) => item.trim()).filter(Boolean);
 }
 
 async function api(path, options = {}) {

@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { initWorkspace, findWorkspace, listResumes, loadProfile, loadResume, WorkspaceError } from './workspace.mjs';
+import { loadUserConfig, rememberVault } from './user-config.mjs';
 import { startServer } from './server.mjs';
 import { renderResume } from './render.mjs';
 import { writeResumePdf } from './pdf.mjs';
@@ -30,8 +31,9 @@ try {
   if (args.command === 'init') {
     const target = args.dir || process.cwd();
     const workspace = await initWorkspace(target);
+    await rememberVault(workspace.root);
     console.log(`Workspace ready: ${workspace.root}`);
-    console.log('Next: resume-builder --dir "' + workspace.root + '"');
+    console.log('This is now the default vault. Next: resume-builder');
     process.exit(0);
   }
 
@@ -90,11 +92,25 @@ async function serveWorkspace(workspace, port, open) {
   console.log('Resume Builder');
   console.log(`Workspace: ${workspace.root}`);
   console.log(`Web UI:    ${url}`);
+  console.log(`MCP:       ${url.replace(/\/$/, '')}/mcp`);
   if (open) openBrowser(url);
 }
 
 async function resolveWorkspace(dir) {
-  return findWorkspace(dir || process.cwd());
+  if (dir) {
+    const workspace = await findWorkspace(dir);
+    await rememberVault(workspace.root);
+    return workspace;
+  }
+  try {
+    return await findWorkspace(process.cwd());
+  } catch {
+    const config = await loadUserConfig();
+    if (config.defaultVault) return findWorkspace(config.defaultVault);
+    throw new WorkspaceError(
+      'No vault found. Run `resume-builder init <dir>` or set a default vault in the app (Settings → Vault).',
+    );
+  }
 }
 
 function parseArgs(argv) {

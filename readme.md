@@ -2,7 +2,7 @@
 
 A local resume builder you install from the terminal. By default it opens a **Tauri desktop window**; the Node server runs beside it as a sidecar. The same UI is also available in a normal browser at `http://127.0.0.1:4173/`.
 
-The app and your resume data are separate: this repository is the product; after install, your profile and resumes live in their own workspace folder (usually its own git repo).
+The app and your resume data are separate: this repository is the product; after install, your profile and resumes live in their own workspace folder.
 
 ## Install / update / uninstall
 
@@ -37,7 +37,7 @@ On Windows:
 resume-builder init $HOME\Documents\my-resumes
 ```
 
-`init` writes a workspace marker, an empty profile, a `resumes/` folder, and runs `git init` if the folder is not already a git repo.
+`init` writes a workspace marker, an empty profile, and a `resumes/` folder. It does not create a Git repository. You can run `git init` in the vault yourself if you want version control.
 
 ## Run
 
@@ -68,7 +68,7 @@ Server only (no window):
 resume-builder serve --dir ~/Documents/my-resumes
 ```
 
-Edit your profile, create role-specific resumes, preview them, and export PDFs. Changes autosave into the workspace as JSON.
+Edit your profile, then write each resume as Markdown. Use **Edit** and **Preview** modes, and export PDFs. Changes autosave into the workspace.
 
 ## Commands
 
@@ -139,4 +139,6 @@ Node CLI smoke tests for Windows and Linux run on every push/PR via `.github/wor
 
 ## AI authoring skills
 
-Optional writing guidance lives in `skills/` for people (or agents) drafting resume content: research, impact writing, ATS optimization, and a final critic pass. The Web UI does not run those skills automatically.
+While the app is running it hosts an MCP server at `http://127.0.0.1:4173/mcp`. Point Grok, Cursor, Codex, Gemini, or any other agent at that URL in its MCP config. The app does not run an LLM itself.
+
+Optional writing guidance lives in `skills/` (built-in) and workspace `skills/` (yours). Agents can load those through MCP.

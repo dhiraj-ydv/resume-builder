@@ -12,9 +12,15 @@ import {
   saveResume,
   deleteResume,
   SCHEMA_VERSION,
+  findWorkspace,
+  initWorkspace,
 } from './workspace.mjs';
+import { loadUserConfig, rememberVault } from './user-config.mjs';
 import { renderResume } from './render.mjs';
 import { pdfPaths, writeResumePdf } from './pdf.mjs';
+import { listSkills, loadSkill, createSkill, saveSkill, deleteSkill, setSkillEnabled } from './skills-store.mjs';
+import { loadMemory, saveMemory } from './memory.mjs';
+import { handleMcpRequest, mcpSnippet } from './mcp.mjs';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const webDir = path.join(appRoot, 'web');
@@ -33,8 +39,9 @@ const mimeTypes = new Map([
 ]);
 
 export function startServer({ workspaceRoot, port }) {
+  const state = { workspaceRoot };
   const server = http.createServer((req, res) => {
-    handle(req, res, workspaceRoot).catch((error) => {
+    handle(req, res, state, port).catch((error) => {
       sendError(res, error);
     });
   });
@@ -45,12 +52,14 @@ export function startServer({ workspaceRoot, port }) {
       resolve({
         server,
         url: `http://127.0.0.1:${port}/`,
+        mcpUrl: `http://127.0.0.1:${port}/mcp`,
       });
     });
   });
 }
 
-async function handle(req, res, workspaceRoot) {
+async function handle(req, res, state, port) {
+  const workspaceRoot = state.workspaceRoot;
   const requestUrl = new URL(req.url || '/', 'http://127.0.0.1');
   const method = req.method || 'GET';
   const pathname = decodeURIComponent(requestUrl.pathname);
@@ -60,7 +69,32 @@ async function handle(req, res, workspaceRoot) {
   }
 
   if (pathname === '/api/workspace' && method === 'GET') {
-    return sendJson(res, { root: workspaceRoot, schemaVersion: SCHEMA_VERSION });
+    const config = await loadUserConfig();
+    return sendJson(res, {
+      root: workspaceRoot,
+      name: path.basename(workspaceRoot),
+      schemaVersion: SCHEMA_VERSION,
+      defaultVault: config.defaultVault || workspaceRoot,
+      recentVaults: config.recentVaults || [],
+    });
+  }
+
+  if (pathname === '/api/workspace' && method === 'PUT') {
+    const body = await readJson(req);
+    const target = String(body.root || '').trim();
+    if (!target) throw new WorkspaceError('A vault path is required.');
+    const workspace = body.init
+      ? await initWorkspace(target)
+      : await findWorkspace(target);
+    state.workspaceRoot = workspace.root;
+    const config = await rememberVault(workspace.root, { setDefault: body.setDefault !== false });
+    return sendJson(res, {
+      root: workspace.root,
+      name: path.basename(workspace.root),
+      schemaVersion: SCHEMA_VERSION,
+      defaultVault: config.defaultVault,
+      recentVaults: config.recentVaults,
+    });
   }
 
   if (pathname === '/api/profile' && method === 'GET') {
@@ -70,6 +104,67 @@ async function handle(req, res, workspaceRoot) {
   if (pathname === '/api/profile' && method === 'PUT') {
     const body = await readJson(req);
     return sendJson(res, await saveProfile(workspaceRoot, body));
+  }
+
+  if (pathname === '/api/mcp' && method === 'GET') {
+    return sendJson(res, mcpSnippet(`http://127.0.0.1:${port}/mcp`));
+  }
+
+  if (pathname === '/mcp' && method === 'OPTIONS') {
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'content-type, mcp-session-id, mcp-protocol-version',
+      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+    });
+    res.end();
+    return;
+  }
+
+  if (pathname === '/mcp') {
+    const body = method === 'POST' ? await readJson(req) : undefined;
+    return handleMcpRequest(req, res, body, workspaceRoot);
+  }
+
+  if (pathname === '/api/memory' && method === 'GET') {
+    return sendJson(res, await loadMemory(workspaceRoot));
+  }
+
+  if (pathname === '/api/memory' && method === 'PUT') {
+    const body = await readJson(req);
+    return sendJson(res, await saveMemory(workspaceRoot, body));
+  }
+
+  if (pathname === '/api/skills' && method === 'GET') {
+    return sendJson(res, { skills: await listSkills(workspaceRoot) });
+  }
+
+  if (pathname === '/api/skills' && method === 'POST') {
+    const body = await readJson(req);
+    res.statusCode = 201;
+    return sendJson(res, await createSkill(workspaceRoot, body));
+  }
+
+  const skillEnabledMatch = pathname.match(/^\/api\/skills\/([^/]+)\/enabled$/);
+  if (skillEnabledMatch && method === 'PUT') {
+    const slug = decodeURIComponent(skillEnabledMatch[1]);
+    const body = await readJson(req);
+    return sendJson(res, await setSkillEnabled(workspaceRoot, slug, body.enabled !== false));
+  }
+
+  const skillMatch = pathname.match(/^\/api\/skills\/([^/]+)$/);
+  if (skillMatch) {
+    const slug = decodeURIComponent(skillMatch[1]);
+    if (method === 'GET') return sendJson(res, await loadSkill(workspaceRoot, slug));
+    if (method === 'PUT') {
+      const body = await readJson(req);
+      return sendJson(res, await saveSkill(workspaceRoot, slug, body));
+    }
+    if (method === 'DELETE') {
+      await deleteSkill(workspaceRoot, slug);
+      res.statusCode = 204;
+      res.end();
+      return;
+    }
   }
 
   if (pathname === '/api/resumes' && method === 'GET') {
@@ -115,8 +210,9 @@ async function handle(req, res, workspaceRoot) {
 
   const previewMatch = pathname.match(/^\/preview\/([^/]+)\/?$/);
   if (previewMatch && method === 'GET') {
+    const slug = decodeURIComponent(previewMatch[1]);
     const profile = await loadProfile(workspaceRoot);
-    const resume = await loadResume(workspaceRoot, decodeURIComponent(previewMatch[1]));
+    const resume = await loadResume(workspaceRoot, slug);
     return sendHtml(res, renderResume(profile, resume));
   }
 
