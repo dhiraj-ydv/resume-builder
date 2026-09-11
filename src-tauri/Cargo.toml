@@ -1,0 +1,18 @@
+[package]
+name = "resume-builder"
+version = "0.1.0"
+description = "Resume Builder desktop shell"
+authors = ["Resume Builder"]
+edition = "2021"
+
+[lib]
+name = "resume_builder_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

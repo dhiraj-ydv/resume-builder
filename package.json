@@ -1,0 +1,42 @@
+{
+  "name": "resume-builder",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local resume builder: install from the CLI, edit in a browser, keep data in your own repo.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dhiraj-ydv/resume-builder.git"
+  },
+  "bin": {
+    "resume-builder": "./bin/resume-builder.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "web",
+    "templates",
+    "skills",
+    "desktop",
+    "readme.md",
+    "AGENTS.md"
+  ],
+  "scripts": {
+    "start": "node bin/resume-builder.mjs",
+    "serve": "node bin/resume-builder.mjs serve --browser",
+    "desktop": "node bin/resume-builder.mjs desktop",
+    "tauri": "tauri",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build",
+    "resume-builder": "node bin/resume-builder.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "playwright": "^1.55.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.8.5"
+  }
+}
