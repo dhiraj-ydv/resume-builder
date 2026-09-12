@@ -107,35 +107,21 @@ Early open-source releases may be unsigned and can display a Windows SmartScreen
 
 ### Linux
 
-Linux is supported through an open-source build. Prebuilt `.deb`, AppImage, Flatpak, and store packages are not distributed.
-
-Install Node.js 20+, Rust stable, and the Tauri system dependencies for your distribution. On Ubuntu or Debian:
+Linux uses a permanent, per-user [Nix profile](https://nix.dev/manual/nix/latest/command-ref/new-cli/nix3-profile). Install Nix with flakes enabled, then run:
 
 ```bash
-sudo apt update
-sudo apt install build-essential pkg-config curl wget file \
-  libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
-  librsvg2-dev libssl-dev libxdo-dev patchelf
+nix profile install github:exolithelabs/resume-builder#resume-builder
 ```
 
-Clone the repository and run the Linux-only per-user installer:
+No Git clone, Node.js, Rust toolchain, Flatpak, or distribution-specific build dependencies are required. Nix fetches the repository into its store, builds the pinned flake in an isolated environment, and adds the finished application to your user profile. The profile keeps the installation available across reboots; temporary build files and old, unreferenced store objects can later be reclaimed by Nix garbage collection.
 
-```bash
-git clone https://github.com/exolithelabs/resume-builder.git
-cd resume-builder
-bash scripts/install-linux.sh
-```
+The package provides:
 
-The installer:
+- `resume-builder` on the profile PATH.
+- The Tauri desktop application and bundled Node sidecar.
+- An application-menu entry and icon on desktops that load Nix profile applications.
 
-- Builds the application from source.
-- Installs the command at `~/.local/bin/resume-builder`.
-- Places bundled resources under `~/.local/lib/resume-builder`.
-- Adds `~/.local/bin` to `~/.profile` when necessary.
-- Creates an application-menu entry and icon.
-- Does not require `sudo` after the build dependencies are installed.
-
-Start a new login session after the first installation so the PATH change is loaded.
+If `resume-builder` is not found immediately after installing Nix, start a new login shell so the Nix profile environment is loaded.
 
 ## Command line
 
@@ -148,7 +134,7 @@ resume-builder serve [dir]         Start the localhost server only
 resume-builder init [dir]          Create a resume workspace
 resume-builder build [dir]         Generate PDFs for every resume
 resume-builder update              Show platform update instructions
-resume-builder uninstall           Uninstall on Linux; show Windows guidance
+resume-builder uninstall           Show platform uninstall instructions
 resume-builder --help              Show command help
 ```
 
@@ -225,6 +211,15 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 User data must never be added to this repository. Use a workspace outside the source checkout for development and testing.
 
+To build the Linux package directly from a source checkout, use Nix:
+
+```bash
+nix build
+./result/bin/resume-builder
+```
+
+`nix build` creates only the local `result` symlink; use `nix profile install .` when you intentionally want a permanent profile installation from a checkout.
+
 ## Releases and updates
 
 ### Windows releases
@@ -253,11 +248,10 @@ GitHub Actions rejects a version tag that does not match the packaged version.
 ### Updating
 
 - **Windows:** download and run the newer installer over the existing installation.
-- **Linux:** pull the latest source and rerun the installer.
+- **Linux:** upgrade the package in the Nix profile.
 
 ```bash
-git pull --ff-only
-bash scripts/install-linux.sh
+nix profile upgrade '.*resume-builder'
 ```
 
 The app checks GitHub's latest public release in the background and displays a dismissible notification when a newer semantic version is available. Users can also run a fresh check from **Settings > Check for updates**. This uses GitHub's public API without credentials, is cached, and never blocks offline work. Automatic download and installation through the Tauri updater are not enabled yet; that requires a final HTTPS update-manifest URL and a separate updater-signing key pair.
@@ -271,7 +265,7 @@ Use **Windows Settings > Apps > Resume Builder > Uninstall**.
 ### Linux
 
 ```bash
-resume-builder uninstall
+nix profile remove '.*resume-builder'
 ```
 
 Both uninstall paths preserve every resume workspace.
@@ -300,7 +294,7 @@ No. Application files and workspace data are deliberately stored separately.
 
 ### Where are Linux packages?
 
-Linux is distributed as source for the initial open-source launch. Build and install it with `bash scripts/install-linux.sh`.
+Linux is installed from the repository's reproducible Nix flake. Run `nix profile install github:exolithelabs/resume-builder#resume-builder`; Nix performs the source fetch and build without leaving a working Git clone.
 
 ## Contributing
 

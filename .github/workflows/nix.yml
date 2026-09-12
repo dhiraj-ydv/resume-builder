@@ -1,0 +1,47 @@
+name: Nix package
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Linux (${{ matrix.system }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - system: x86_64-linux
+            runner: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: cachix/install-nix-action@v31.11.1
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve pinned inputs
+        run: |
+          nix flake lock
+          cat flake.lock
+
+      - name: Check flake outputs
+        run: nix flake check --no-build --show-trace
+
+      - name: Build package
+        run: nix build --print-build-logs
+
+      - name: Verify packaged CLI and desktop files
+        run: |
+          test -x result/bin/resume-builder
+          test -x result/lib/resume-builder/runtime/node
+          test -f result/lib/resume-builder/app/bin/resume-builder.mjs
+          test -f result/share/applications/resume-builder.desktop
+          result/lib/resume-builder/runtime/node \
+            result/lib/resume-builder/app/bin/resume-builder.mjs --help

@@ -196,7 +196,7 @@ function printHelp() {
 
 Install:
   Windows: download the installer from the product website.
-  Linux: build the open-source project using the repository README.
+  Linux: nix profile install github:exolithelabs/resume-builder#resume-builder
 
 Usage:
   resume-builder [dir]               Run (desktop window by default)
@@ -216,6 +216,6 @@ Options:
   --sidecar        Used by the Tauri desktop shell to start Node
 
 The desktop window and the browser both talk to http://127.0.0.1:4173/.
-Download updates from the product website. Uninstalling never removes resume workspaces.
+Use the Windows installer or Nix profile to update. Uninstalling never removes resume workspaces.
 `);
 }
