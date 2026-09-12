@@ -18,6 +18,8 @@ for (const entry of ['bin', 'src', 'web', 'templates', 'skills']) {
 for (const entry of ['package.json', 'package-lock.json', 'LICENSE', 'NOTICE', 'THIRD-PARTY-NOTICES.md']) {
   await cp(path.join(projectRoot, entry), path.join(appRoot, entry));
 }
+await cp(path.join(projectRoot, 'scripts', 'install-linux.sh'), path.join(resourcesRoot, 'install-linux.sh'));
+await chmod(path.join(resourcesRoot, 'install-linux.sh'), 0o755);
 
 const npmCommand = process.platform === 'win32'
   ? [process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', 'npm.cmd', 'ci', '--omit=dev', '--ignore-scripts']]

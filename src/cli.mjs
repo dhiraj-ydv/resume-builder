@@ -196,7 +196,7 @@ function printHelp() {
 
 Install:
   Windows: download the installer from the product website.
-  Linux: build the open-source project using the repository README.
+  Linux: curl -fsSL https://raw.githubusercontent.com/exolithelabs/resume-builder/main/scripts/install-linux.sh | sh
 
 Usage:
   resume-builder [dir]               Run (desktop window by default)
@@ -216,6 +216,7 @@ Options:
   --sidecar        Used by the Tauri desktop shell to start Node
 
 The desktop window and the browser both talk to http://127.0.0.1:4173/.
-Download updates from the product website. Uninstalling never removes resume workspaces.
+Run resume-builder update on Linux or use the product website on Windows.
+Uninstalling never removes resume workspaces.
 `);
 }

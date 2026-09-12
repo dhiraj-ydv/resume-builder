@@ -447,14 +447,14 @@ async function renderDocs() {
 
       <section class="docs-section" id="docs-install">
         <h2>Install and run</h2>
-        <p>Windows users can download the signed installer from the product website; Node.js and npm are bundled. Linux users build the open-source project using the repository README.</p>
+        <p>Windows users download the installer from the product website. Linux users run the release installer, which downloads a verified prebuilt package for x64 or ARM64. Node.js and npm are bundled on both platforms.</p>
         <pre>Windows: download and run the .exe installer
-Linux: bash scripts/install-linux.sh</pre>
+Linux: curl -fsSL https://raw.githubusercontent.com/exolithelabs/resume-builder/main/scripts/install-linux.sh | sh</pre>
         <ul>
           <li><code>resume-builder</code> opens the desktop window by default.</li>
           <li><code>resume-builder --browser</code> opens the same UI in a web browser.</li>
           <li><code>resume-builder serve</code> starts the server only.</li>
-          <li>On Windows, download updates from the product website. On Linux, pull the latest source and rebuild.</li>
+          <li>On Windows, download updates from the product website. On Linux, run <code>resume-builder update</code>.</li>
           <li>Removing the app does not remove your workspace.</li>
         </ul>
         <p>The UI is at <code>http://127.0.0.1:4173/</code> while the app is running.</p>

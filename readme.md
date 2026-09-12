@@ -107,33 +107,21 @@ Early open-source releases may be unsigned and can display a Windows SmartScreen
 
 ### Linux
 
-Linux is supported through an open-source build. Prebuilt `.deb`, AppImage, Flatpak, and store packages are not distributed.
-
-Install Node.js 20+, Rust stable, and the Tauri system dependencies for your distribution. On Ubuntu or Debian:
+Install the latest prebuilt x64 or ARM64 release for the current user:
 
 ```bash
-sudo apt update
-sudo apt install build-essential pkg-config curl wget file \
-  libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
-  librsvg2-dev libssl-dev libxdo-dev patchelf
-```
-
-Clone the repository and run the Linux-only per-user installer:
-
-```bash
-git clone https://github.com/exolithelabs/resume-builder.git
-cd resume-builder
-bash scripts/install-linux.sh
+curl -fsSL https://raw.githubusercontent.com/exolithelabs/resume-builder/main/scripts/install-linux.sh | sh
 ```
 
 The installer:
 
-- Builds the application from source.
-- Installs the command at `~/.local/bin/resume-builder`.
-- Places bundled resources under `~/.local/lib/resume-builder`.
+- Detects `x86_64` or `aarch64` automatically.
+- Downloads the matching archive from the latest GitHub Release.
+- Verifies the archive against its published SHA-256 checksum before changing the installation.
+- Installs the command at `~/.local/bin/resume-builder` and the private application tree under `~/.local/lib/resume-builder`.
 - Adds `~/.local/bin` to `~/.profile` when necessary.
 - Creates an application-menu entry and icon.
-- Does not require `sudo` after the build dependencies are installed.
+- Does not require `sudo`, Git, Node.js, npm, Rust, Nix, Flatpak, or a local build.
 
 Start a new login session after the first installation so the PATH change is loaded.
 
@@ -227,9 +215,9 @@ User data must never be added to this repository. Use a workspace outside the so
 
 ## Releases and updates
 
-### Windows releases
+### Desktop releases
 
-The [Windows desktop workflow](.github/workflows/desktop.yml) builds the NSIS installer when a `v*` tag is pushed or the workflow is started manually. The resulting `windows-installer` artifact and SHA-256 checksum are intended to be published on the product website.
+The [desktop downloads workflow](.github/workflows/desktop.yml) builds the Windows NSIS installer and prebuilt Linux x64/ARM64 archives when a `v*` tag is pushed or the workflow is started manually. Tagged builds publish every package and SHA-256 checksum to one GitHub Release; the website can link to or mirror those assets.
 
 Code signing is optional. With neither signing secret configured, the workflow produces an unsigned installer. If an exportable PFX certificate is available, configure both encrypted GitHub Actions secrets:
 
@@ -253,11 +241,10 @@ GitHub Actions rejects a version tag that does not match the packaged version.
 ### Updating
 
 - **Windows:** download and run the newer installer over the existing installation.
-- **Linux:** pull the latest source and rerun the installer.
+- **Linux:** let the installed release script download, verify, and replace the application atomically.
 
 ```bash
-git pull --ff-only
-bash scripts/install-linux.sh
+resume-builder update
 ```
 
 The app checks GitHub's latest public release in the background and displays a dismissible notification when a newer semantic version is available. Users can also run a fresh check from **Settings > Check for updates**. This uses GitHub's public API without credentials, is cached, and never blocks offline work. Automatic download and installation through the Tauri updater are not enabled yet; that requires a final HTTPS update-manifest URL and a separate updater-signing key pair.
@@ -300,7 +287,7 @@ No. Application files and workspace data are deliberately stored separately.
 
 ### Where are Linux packages?
 
-Linux is distributed as source for the initial open-source launch. Build and install it with `bash scripts/install-linux.sh`.
+GitHub Releases contain `resume-builder-linux-x64.tar.gz` and `resume-builder-linux-arm64.tar.gz`, each with a `.sha256` file. The one-line installer selects and verifies the correct archive automatically.
 
 ## Contributing
 

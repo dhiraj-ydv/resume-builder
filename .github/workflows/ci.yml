@@ -29,6 +29,10 @@ jobs:
 
       - run: npm test
 
+      - name: Test Linux release installer
+        if: runner.os == 'Linux'
+        run: sh scripts/test-install-linux.sh
+
       - name: CLI help
         run: node bin/resume-builder.mjs --help
 
