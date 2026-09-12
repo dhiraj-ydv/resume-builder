@@ -27,7 +27,7 @@ pub fn run() {
                 .unwrap_or(4173);
             let port = available_port(preferred_port)?.to_string();
             let launch_token = Uuid::new_v4().to_string();
-            let url = format!("http://127.0.0.1:{port}/");
+            let url = format!("http://127.0.0.1:{port}/?desktop=1");
             let mut sidecar = spawn_node_sidecar(app.handle(), &port, &launch_token)?;
 
             if !wait_for_sidecar(&port, &launch_token, &mut sidecar, Duration::from_secs(20)) {
