@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-const REPOSITORY = 'dhiraj-ydv/resume-builder';
+const REPOSITORY = 'exolithelabs/resume-builder';
 const RELEASES_API = `https://api.github.com/repos/${REPOSITORY}/releases/latest`;
 const RELEASE_URL_PREFIX = `https://github.com/${REPOSITORY}/releases/tag/`;
 const CACHE_MS = 60 * 60 * 1000;

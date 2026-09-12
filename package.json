@@ -15,11 +15,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dhiraj-ydv/resume-builder.git"
+    "url": "git+https://github.com/exolithelabs/resume-builder.git"
   },
-  "homepage": "https://github.com/dhiraj-ydv/resume-builder#readme",
+  "homepage": "https://github.com/exolithelabs/resume-builder#readme",
   "bugs": {
-    "url": "https://github.com/dhiraj-ydv/resume-builder/issues"
+    "url": "https://github.com/exolithelabs/resume-builder/issues"
   },
   "bin": {
     "resume-builder": "./bin/resume-builder.mjs"

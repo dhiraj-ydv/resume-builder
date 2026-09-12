@@ -117,7 +117,7 @@ sudo apt install build-essential pkg-config curl wget file \
 Clone the repository and run the Linux-only per-user installer:
 
 ```bash
-git clone https://github.com/dhiraj-ydv/resume-builder.git
+git clone https://github.com/exolithelabs/resume-builder.git
 cd resume-builder
 bash scripts/install-linux.sh
 ```
