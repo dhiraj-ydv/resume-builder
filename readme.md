@@ -304,7 +304,7 @@ Linux is distributed as source for the initial open-source launch. Build and ins
 
 ## Contributing
 
-External pull requests are not accepted and will be closed. Bug reports and focused suggestions are welcome through GitHub Issues; see [CONTRIBUTING.md](CONTRIBUTING.md). Report security vulnerabilities privately according to [SECURITY.md](SECURITY.md), without attaching real resume data.
+External pull requests are not accepted and will be closed. Submit bug reports and focused suggestions through the structured [GitHub issue forms](https://github.com/exolithelabs/resume-builder/issues/new/choose); see [CONTRIBUTING.md](CONTRIBUTING.md). Report security vulnerabilities privately according to [SECURITY.md](SECURITY.md), without attaching real resume data.
 
 ## License
 

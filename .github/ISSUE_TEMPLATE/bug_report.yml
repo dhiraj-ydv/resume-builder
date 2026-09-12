@@ -1,0 +1,89 @@
+name: Bug report
+description: Report a reproducible problem with Resume Builder.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Use synthetic data only and remove personal information from screenshots, logs, and examples.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for the same problem.
+          required: true
+        - label: This report contains no real resume, profile, credential, or other private data.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Resume Builder version
+      description: Enter the installed version or Git commit.
+      placeholder: 0.1.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: operating-system
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - Linux
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Interface
+      options:
+        - Desktop app
+        - Browser UI
+        - CLI
+        - MCP
+        - PDF export
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Provide the smallest reliable sequence that demonstrates the problem.
+      placeholder: |
+        1. Run ...
+        2. Open ...
+        3. Select ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Additional diagnostics
+      description: Add sanitized logs, screenshots, or other context if useful. Do not include private data.
+      render: shell

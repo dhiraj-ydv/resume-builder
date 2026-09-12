@@ -2,7 +2,7 @@
 
 Resume Builder is maintained as a personal open-source project. External code contributions are not currently accepted. Please do not open pull requests; they will be closed without review.
 
-Bug reports and focused suggestions are welcome through GitHub Issues. Report security vulnerabilities privately according to `SECURITY.md`.
+Bug reports and focused suggestions are welcome through the repository's [issue forms](https://github.com/exolithelabs/resume-builder/issues/new/choose). Use the appropriate form so reports contain enough context to evaluate. Report security vulnerabilities privately according to [SECURITY.md](SECURITY.md).
 
 ## Project boundaries
 

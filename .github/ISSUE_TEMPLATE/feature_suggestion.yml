@@ -1,0 +1,59 @@
+name: Feature suggestion
+description: Suggest a focused improvement to Resume Builder.
+title: "[Suggestion]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Focused suggestions are welcome. External pull requests are not accepted, so please describe the problem and desired outcome rather than submitting implementation work.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for the same suggestion.
+          required: true
+        - label: This suggestion contains no private resume or profile data.
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What limitation or recurring difficulty would this address?
+    validations:
+      required: true
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe what should become possible, without requiring a specific implementation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe any current workaround or alternative approach.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Product area
+      options:
+        - Desktop app
+        - Browser UI
+        - CLI
+        - MCP
+        - Resume workspace
+        - Templates and PDF export
+        - Installation and updates
+        - Documentation
+        - Other
+    validations:
+      required: true
