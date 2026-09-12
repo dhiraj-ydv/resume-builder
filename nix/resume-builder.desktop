@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Resume Builder
-Comment=Build focused, ATS-friendly resumes in a private local workspace
-Exec=@out@/bin/resume-builder
-Icon=resume-builder
-Terminal=false
-Categories=Office;Utility;
-StartupNotify=true

@@ -7,8 +7,6 @@ coverage/
 src-tauri/target/
 src-tauri/resources/
 src-tauri/tauri.windows-signing.conf.json
-/result
-/.direnv/
 desktop/*.exe
 desktop/*.app
 desktop/*.dll
