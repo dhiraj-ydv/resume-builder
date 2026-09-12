@@ -1,4 +1,4 @@
-name: Desktop downloads
+name: Windows desktop download
 
 on:
   workflow_dispatch:
@@ -13,6 +13,8 @@ jobs:
   build-windows:
     name: Windows installer
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
 
@@ -97,93 +99,17 @@ jobs:
             src-tauri/target/release/bundle/nsis/*-setup.exe.sha256
           if-no-files-found: error
 
-  build-linux:
-    name: Linux ${{ matrix.release_arch }}
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - release_arch: x64
-            runner: ubuntu-22.04
-          - release_arch: arm64
-            runner: ubuntu-22.04-arm
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Install Tauri build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential curl file libayatana-appindicator3-dev \
-            libfuse2 libgtk-3-dev librsvg2-dev libssl-dev libwebkit2gtk-4.1-dev \
-            patchelf pkg-config wget xvfb
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 20
-          cache: npm
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: swatinem/rust-cache@v2
-        with:
-          workspaces: './src-tauri -> target'
-          shared-key: linux-${{ matrix.release_arch }}
-
-      - run: npm ci
-      - name: Verify release version
-        run: |
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            npm run version:check -- "${GITHUB_REF_NAME}"
-          else
-            npm run version:check
-          fi
-      - run: npm run desktop:prepare
-      - name: Build AppImage payload
-        run: npm run tauri build -- --bundles appimage
-      - name: Create prebuilt release archive
-        run: sh scripts/package-linux-release.sh "${{ matrix.release_arch }}"
-
-      - name: Smoke-test packaged application
-        run: |
-          mkdir "${RUNNER_TEMP}/resume-builder-smoke"
-          tar -xzf "dist/linux/resume-builder-linux-${{ matrix.release_arch }}.tar.gz" \
-            -C "${RUNNER_TEMP}/resume-builder-smoke"
-          xvfb-run -a "${RUNNER_TEMP}/resume-builder-smoke/app/AppRun" --help
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux-${{ matrix.release_arch }}
-          path: |
-            dist/linux/resume-builder-linux-${{ matrix.release_arch }}.tar.gz
-            dist/linux/resume-builder-linux-${{ matrix.release_arch }}.tar.gz.sha256
-          if-no-files-found: error
-
-  publish:
-    name: Publish GitHub Release
-    if: github.ref_type == 'tag'
-    needs: [build-windows, build-linux]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: release-assets
-          merge-multiple: true
-
-      - name: Publish all desktop downloads
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          mapfile -t assets < <(find release-assets -maxdepth 1 -type f -print | sort)
-          if [[ "${#assets[@]}" -eq 0 ]]; then
-            echo "No release assets were downloaded."
-            exit 1
-          fi
-          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            gh release upload "${GITHUB_REF_NAME}" "${assets[@]}" --clobber
-          else
-            gh release create "${GITHUB_REF_NAME}" "${assets[@]}" \
-              --verify-tag --generate-notes --title "Resume Builder ${GITHUB_REF_NAME}"
+          $installer = Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
+          $checksum = Get-Item "$($installer.FullName).sha256"
+          gh release view $env:GITHUB_REF_NAME *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:GITHUB_REF_NAME $installer.FullName $checksum.FullName --clobber
+          } else {
+            gh release create $env:GITHUB_REF_NAME $installer.FullName $checksum.FullName --verify-tag --generate-notes --title "Resume Builder $env:GITHUB_REF_NAME"
+          }
