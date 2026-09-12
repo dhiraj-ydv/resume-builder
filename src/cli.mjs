@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { homedir } from 'node:os';
 import { initWorkspace, findWorkspace, listResumes, loadProfile, loadResume, WorkspaceError } from './workspace.mjs';
 import { loadUserConfig, rememberVault } from './user-config.mjs';
 import { startServer } from './server.mjs';
@@ -7,9 +7,11 @@ import { renderResume } from './render.mjs';
 import { writeResumePdf } from './pdf.mjs';
 import { launchDesktop } from './desktop.mjs';
 import { installApp, uninstallApp, updateApp } from './lifecycle.mjs';
+import { openBrowser } from './browser.mjs';
 
 try {
   const args = parseArgs(process.argv.slice(2));
+  const createDefaultWorkspace = args.sidecar || process.env.RESUME_BUILDER_PACKAGED === '1';
 
   if (args.help || args.command === 'help') {
     printHelp();
@@ -38,7 +40,7 @@ try {
   }
 
   if (args.command === 'desktop' || args.command === 'run') {
-    const workspace = await resolveWorkspace(args.dir);
+    const workspace = await resolveWorkspace(args.dir, { createDefault: createDefaultWorkspace });
     try {
       await launchDesktop({ workspaceRoot: workspace.root, port: args.port });
     } catch (error) {
@@ -58,10 +60,10 @@ try {
       }
     }
   } else if (args.command === 'serve') {
-    const workspace = await resolveWorkspace(args.dir);
+    const workspace = await resolveWorkspace(args.dir, { createDefault: createDefaultWorkspace });
     await serveWorkspace(workspace, args.port, args.open);
   } else if (args.command === 'build') {
-    const workspace = await resolveWorkspace(args.dir);
+    const workspace = await resolveWorkspace(args.dir, { createDefault: createDefaultWorkspace });
     const profile = await loadProfile(workspace.root);
     const resumes = await listResumes(workspace.root);
     if (resumes.length === 0) {
@@ -96,7 +98,7 @@ async function serveWorkspace(workspace, port, open) {
   if (open) openBrowser(url);
 }
 
-async function resolveWorkspace(dir) {
+async function resolveWorkspace(dir, { createDefault = false } = {}) {
   if (dir) {
     const workspace = await findWorkspace(dir);
     await rememberVault(workspace.root);
@@ -107,6 +109,11 @@ async function resolveWorkspace(dir) {
   } catch {
     const config = await loadUserConfig();
     if (config.defaultVault) return findWorkspace(config.defaultVault);
+    if (createDefault) {
+      const workspace = await initWorkspace(path.join(homedir(), 'Documents', 'Resume Builder'));
+      await rememberVault(workspace.root);
+      return workspace;
+    }
     throw new WorkspaceError(
       'No vault found. Run `resume-builder init <dir>` or set a default vault in the app (Settings → Vault).',
     );
@@ -121,6 +128,7 @@ function parseArgs(argv) {
     open: false,
     help: false,
     browserFallback: true,
+    sidecar: false,
   };
   const positionals = [];
 
@@ -134,6 +142,7 @@ function parseArgs(argv) {
     } else if (token === '--sidecar') {
       result.command = 'serve';
       result.open = false;
+      result.sidecar = true;
     } else if (token === '--no-open') {
       result.open = false;
     } else if (token === '--no-fallback') {
@@ -182,28 +191,12 @@ function parseArgs(argv) {
   return result;
 }
 
-function openBrowser(url) {
-  const platform = process.platform;
-  try {
-    if (platform === 'win32') {
-      spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' }).unref();
-    } else if (platform === 'darwin') {
-      spawn('open', [url], { detached: true, stdio: 'ignore' }).unref();
-    } else {
-      spawn('xdg-open', [url], { detached: true, stdio: 'ignore' }).unref();
-    }
-  } catch {
-    console.warn(`Could not open a browser. Open ${url} manually.`);
-  }
-}
-
 function printHelp() {
   console.log(`Resume Builder — local web app for role-specific resumes
 
-Install / update / uninstall:
-  npx github:dhiraj-ydv/resume-builder install
-  resume-builder update
-  resume-builder uninstall
+Install:
+  Windows: download the installer from the product website.
+  Linux: build the open-source project using the repository README.
 
 Usage:
   resume-builder [dir]               Run (desktop window by default)
@@ -223,5 +216,6 @@ Options:
   --sidecar        Used by the Tauri desktop shell to start Node
 
 The desktop window and the browser both talk to http://127.0.0.1:4173/.
+Download updates from the product website. Uninstalling never removes resume workspaces.
 `);
 }

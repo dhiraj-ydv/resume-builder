@@ -1,4 +1,4 @@
-name: Desktop
+name: Windows desktop download
 
 on:
   workflow_dispatch:
@@ -6,72 +6,94 @@ on:
     tags:
       - 'v*'
 
-permissions:
-  contents: write
-
 env:
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
 
 jobs:
-  publish-tauri:
-    name: ${{ matrix.name }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Windows
-            platform: windows-latest
-            args: '--bundles nsis'
-          - name: Linux
-            platform: ubuntu-22.04
-            args: '--bundles deb,appimage'
-    runs-on: ${{ matrix.platform }}
+  build-windows:
+    name: Signed Windows installer
+    runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
-
-      - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            libssl-dev \
-            libxdo-dev \
-            patchelf \
-            build-essential \
-            file \
-            wget \
-            xdg-utils
 
       - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
 
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
+      - uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
 
-      - run: npm install
+      - run: npm ci
+      - name: Verify release version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            npm run version:check -- "${GITHUB_REF_NAME}"
+          else
+            npm run version:check
+          fi
+      - run: npm run desktop:prepare
 
-      - uses: tauri-apps/tauri-action@v1
+      - name: Import Windows code-signing certificate
+        shell: pwsh
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: v__VERSION__
-          releaseName: 'Resume Builder v__VERSION__'
-          releaseBody: |
-            Desktop builds for Windows (NSIS) and Linux (AppImage, deb).
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if (-not $env:WINDOWS_CERTIFICATE -or -not $env:WINDOWS_CERTIFICATE_PASSWORD) {
+            throw 'WINDOWS_CERTIFICATE and WINDOWS_CERTIFICATE_PASSWORD GitHub secrets are required.'
+          }
 
-            The Node sidecar still needs Node.js 20+ on the machine.
-            After install, run `resume-builder init` then `resume-builder`.
-          releaseDraft: true
-          prerelease: false
-          args: ${{ matrix.args }}
+          $certificatePath = Join-Path $env:RUNNER_TEMP 'resume-builder-signing.pfx'
+          [IO.File]::WriteAllBytes($certificatePath, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          $password = ConvertTo-SecureString $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
+          $importedCertificates = Import-PfxCertificate -FilePath $certificatePath -CertStoreLocation Cert:\CurrentUser\My -Password $password
+          $certificate = $importedCertificates | Where-Object HasPrivateKey | Select-Object -First 1
+          if (-not $certificate) {
+            throw 'The imported Windows signing certificate has no private key.'
+          }
+
+          "WINDOWS_CERTIFICATE_THUMBPRINT=$($certificate.Thumbprint)" >> $env:GITHUB_ENV
+
+      - name: Configure Windows code signing
+        run: node scripts/write-windows-signing-config.mjs
+
+      - name: Build signed Windows installer
+        run: npm run tauri build -- --config src-tauri/tauri.windows-signing.conf.json --bundles nsis
+
+      - name: Create installer checksum
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
+          if (-not $installer) { throw 'Windows installer was not created.' }
+          $hash = (Get-FileHash -Algorithm SHA256 $installer.FullName).Hash.ToLowerInvariant()
+          "$hash  $($installer.Name)" | Set-Content -Encoding ascii "$($installer.FullName).sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: |
+            src-tauri/target/release/bundle/nsis/*-setup.exe
+            src-tauri/target/release/bundle/nsis/*-setup.exe.sha256
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $installer = Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
+          $checksum = Get-Item "$($installer.FullName).sha256"
+          gh release view $env:GITHUB_REF_NAME *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:GITHUB_REF_NAME $installer.FullName $checksum.FullName --clobber
+          } else {
+            gh release create $env:GITHUB_REF_NAME $installer.FullName $checksum.FullName --verify-tag --generate-notes --title "Resume Builder $env:GITHUB_REF_NAME"
+          }

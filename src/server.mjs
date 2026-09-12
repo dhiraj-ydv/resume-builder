@@ -21,6 +21,8 @@ import { pdfPaths, writeResumePdf } from './pdf.mjs';
 import { listSkills, loadSkill, createSkill, saveSkill, deleteSkill, setSkillEnabled } from './skills-store.mjs';
 import { loadMemory, saveMemory } from './memory.mjs';
 import { handleMcpRequest, mcpSnippet } from './mcp.mjs';
+import { openBrowser } from './browser.mjs';
+import { checkLatestRelease, CURRENT_VERSION } from './releases.mjs';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const webDir = path.join(appRoot, 'web');
@@ -39,7 +41,10 @@ const mimeTypes = new Map([
 ]);
 
 export function startServer({ workspaceRoot, port }) {
-  const state = { workspaceRoot };
+  const state = {
+    workspaceRoot,
+    launchToken: process.env.RESUME_BUILDER_LAUNCH_TOKEN || '',
+  };
   const server = http.createServer((req, res) => {
     handle(req, res, state, port).catch((error) => {
       sendError(res, error);
@@ -65,7 +70,35 @@ async function handle(req, res, state, port) {
   const pathname = decodeURIComponent(requestUrl.pathname);
 
   if (pathname === '/api/health' && method === 'GET') {
-    return sendJson(res, { ok: true, workspace: workspaceRoot });
+    return sendJson(res, {
+      ok: true,
+      app: 'resume-builder',
+      launchToken: state.launchToken,
+    });
+  }
+
+  if (pathname === '/api/releases/latest' && method === 'GET') {
+    try {
+      return sendJson(res, await checkLatestRelease({
+        useCache: requestUrl.searchParams.get('refresh') !== '1',
+      }));
+    } catch (error) {
+      console.warn(`Release check unavailable: ${error.message}`);
+      return sendJson(res, {
+        checked: false,
+        available: false,
+        currentVersion: CURRENT_VERSION,
+      });
+    }
+  }
+
+  if (pathname === '/api/open-browser' && method === 'POST') {
+    const body = await readJson(req);
+    const hash = typeof body.hash === 'string' && /^#\/[A-Za-z0-9_~./-]*$/.test(body.hash)
+      ? body.hash
+      : '';
+    openBrowser(`http://127.0.0.1:${port}/${hash}`);
+    return sendJson(res, { ok: true });
   }
 
   if (pathname === '/api/workspace' && method === 'GET') {
@@ -261,8 +294,12 @@ async function sendFile(res, filePath, { downloadName } = {}) {
 }
 
 function sendJson(res, payload) {
-  res.writeHead(res.statusCode || 200, { 'Content-Type': 'application/json; charset=utf-8' });
-  res.end(JSON.stringify(payload));
+  const body = JSON.stringify(payload);
+  res.writeHead(res.statusCode || 200, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Content-Length': Buffer.byteLength(body),
+  });
+  res.end(body);
 }
 
 function sendHtml(res, html) {

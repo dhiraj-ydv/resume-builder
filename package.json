@@ -3,10 +3,23 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Local resume builder: install from the CLI, edit in a browser, keep data in your own repo.",
+  "description": "Downloadable local resume builder with desktop, browser, CLI, and MCP access.",
+  "license": "MIT",
+  "author": "Resume Builder contributors",
+  "keywords": [
+    "resume",
+    "cv",
+    "local-first",
+    "tauri",
+    "mcp"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/dhiraj-ydv/resume-builder.git"
+  },
+  "homepage": "https://github.com/dhiraj-ydv/resume-builder#readme",
+  "bugs": {
+    "url": "https://github.com/dhiraj-ydv/resume-builder/issues"
   },
   "bin": {
     "resume-builder": "./bin/resume-builder.mjs"
@@ -22,12 +35,16 @@
     "AGENTS.md"
   ],
   "scripts": {
+    "test": "node --test",
     "start": "node bin/resume-builder.mjs",
     "serve": "node bin/resume-builder.mjs serve --browser",
     "desktop": "node bin/resume-builder.mjs desktop",
+    "desktop:prepare": "node scripts/prepare-desktop-sidecar.mjs",
     "tauri": "tauri",
-    "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build",
+    "desktop:dev": "npm run desktop:prepare && tauri dev",
+    "desktop:build": "npm run desktop:prepare && tauri build",
+    "version:check": "node scripts/version.mjs --check",
+    "version:set": "node scripts/version.mjs --set",
     "resume-builder": "node bin/resume-builder.mjs"
   },
   "engines": {

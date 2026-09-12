@@ -1,5 +1,10 @@
 const app = document.querySelector('#app');
 const saveStatus = document.querySelector('#save-status');
+const releaseNotice = document.querySelector('#release-notice');
+const releaseTitle = document.querySelector('#release-title');
+const releaseDetail = document.querySelector('#release-detail');
+const releaseLink = document.querySelector('#release-link');
+const releaseDismiss = document.querySelector('#release-dismiss');
 
 const createDialog = document.querySelector('#create-dialog');
 const createForm = document.querySelector('#create-form');
@@ -20,6 +25,8 @@ window.addEventListener('hashchange', () => {
 
 const settingsBtn = document.querySelector('#settings-btn');
 const settingsDropdown = document.querySelector('#settings-dropdown');
+const openBrowserBtn = document.querySelector('#open-browser');
+const checkUpdatesBtn = document.querySelector('#check-updates');
 settingsBtn.addEventListener('click', (event) => {
   event.stopPropagation();
   const open = settingsDropdown.hidden;
@@ -27,6 +34,13 @@ settingsBtn.addEventListener('click', (event) => {
   settingsBtn.setAttribute('aria-expanded', String(open));
 });
 settingsDropdown.addEventListener('click', () => closeSettingsMenu());
+openBrowserBtn.addEventListener('click', async () => {
+  await api('/api/open-browser', {
+    method: 'POST',
+    body: JSON.stringify({ hash: location.hash }),
+  });
+});
+checkUpdatesBtn.addEventListener('click', () => checkForLatestRelease({ manual: true }));
 document.addEventListener('click', (event) => {
   if (!event.target.closest('.settings-menu')) closeSettingsMenu();
 });
@@ -60,6 +74,36 @@ createForm.addEventListener('submit', async (event) => {
 });
 
 await render();
+checkForLatestRelease();
+
+async function checkForLatestRelease({ manual = false } = {}) {
+  try {
+    const release = await api(`/api/releases/latest${manual ? '?refresh=1' : ''}`);
+    if (!release.available || !release.tagName || !release.url) {
+      if (manual) showUpdateCheckStatus(`Resume Builder ${release.currentVersion} is up to date.`);
+      return;
+    }
+    if (!manual && localStorage.getItem('resume-builder-dismissed-release') === release.tagName) return;
+
+    releaseTitle.textContent = `${release.name || release.tagName} is available.`;
+    releaseDetail.textContent = `You are using ${release.currentVersion}. Review the release before updating.`;
+    releaseLink.href = release.url;
+    releaseNotice.hidden = false;
+
+    releaseDismiss.onclick = () => {
+      localStorage.setItem('resume-builder-dismissed-release', release.tagName);
+      releaseNotice.hidden = true;
+    };
+  } catch {
+    // Release checks are optional and must never interrupt local work.
+    if (manual) showUpdateCheckStatus('Could not check GitHub releases. Try again when online.');
+  }
+}
+
+function showUpdateCheckStatus(message) {
+  saveStatus.hidden = false;
+  saveStatus.textContent = message;
+}
 
 async function render() {
   const route = parseRoute();
@@ -389,21 +433,20 @@ async function renderDocs() {
       <section class="docs-section" id="docs-overview">
         <h2>Overview</h2>
         <p>Resume Builder is a local app. It does not run an LLM. You write Markdown in the UI, or you point Grok, Cursor, Codex, Gemini, or another agent at this process over MCP.</p>
-        <p>The product (this install) is separate from your data. Resumes live in a workspace folder you create with <code>resume-builder init</code>.</p>
+        <p>The product (this install) is separate from your data. Resumes live in a workspace folder under Documents; first launch creates a default vault automatically.</p>
       </section>
 
       <section class="docs-section" id="docs-install">
         <h2>Install and run</h2>
-        <p>Node.js 20+ is required. You do not need to clone the repo.</p>
-        <pre>npx github:dhiraj-ydv/resume-builder install
-resume-builder init $HOME/Documents/my-resumes
-resume-builder --dir $HOME/Documents/my-resumes</pre>
+        <p>Windows users can download the signed installer from the product website; Node.js and npm are bundled. Linux users build the open-source project using the repository README.</p>
+        <pre>Windows: download and run the .exe installer
+Linux: bash scripts/install-linux.sh</pre>
         <ul>
           <li><code>resume-builder</code> opens the desktop window by default.</li>
           <li><code>resume-builder --browser</code> opens the same UI in a web browser.</li>
           <li><code>resume-builder serve</code> starts the server only.</li>
-          <li><code>resume-builder update</code> reinstalls from GitHub.</li>
-          <li><code>resume-builder uninstall</code> removes the app, not your workspace.</li>
+          <li>On Windows, download updates from the product website. On Linux, pull the latest source and rebuild.</li>
+          <li>Removing the app does not remove your workspace.</li>
         </ul>
         <p>The UI is at <code>http://127.0.0.1:4173/</code> while the app is running.</p>
       </section>

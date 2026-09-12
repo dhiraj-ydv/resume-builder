@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Resume Builder",
   "version": "0.1.0",
-  "identifier": "com.resumebuilder.desktop",
+  "identifier": "io.github.dhiraj-ydv.ResumeBuilder",
   "build": {
     "frontendDist": "splash"
   },
@@ -14,7 +14,21 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "deb", "appimage"],
+    "category": "Productivity",
+    "shortDescription": "Build tailored, ATS-friendly resumes in a local workspace.",
+    "longDescription": "A local-first resume builder with Markdown editing, print-ready previews, PDF export, and an MCP endpoint for external agents.",
+    "resources": {
+      "resources/": ""
+    },
+    "targets": [
+      "nsis"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerHooks": "./windows/installer-hooks.nsh"
+      }
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

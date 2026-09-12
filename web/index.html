@@ -27,9 +27,22 @@
         <a href="#/skills">Skills</a>
         <a href="#/memory">Memory</a>
         <a href="#/docs">Read docs</a>
+        <button type="button" id="check-updates">Check for updates</button>
+        <button type="button" id="open-browser">Open in browser</button>
       </nav>
     </div>
   </header>
+
+  <aside class="release-notice" id="release-notice" role="status" hidden>
+    <div>
+      <strong id="release-title">A new Resume Builder release is available.</strong>
+      <span id="release-detail"></span>
+    </div>
+    <div class="release-actions">
+      <a class="secondary" id="release-link" href="#" target="_blank" rel="noreferrer">View release</a>
+      <button class="ghost" id="release-dismiss" type="button" aria-label="Dismiss update notification">Dismiss</button>
+    </div>
+  </aside>
 
   <main id="app" class="app"></main>
 

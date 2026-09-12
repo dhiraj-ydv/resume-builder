@@ -25,7 +25,9 @@ jobs:
           node-version: 20
           cache: npm
 
-      - run: npm install
+      - run: npm ci
+
+      - run: npm test
 
       - name: CLI help
         run: node bin/resume-builder.mjs --help
@@ -45,3 +47,17 @@ jobs:
           done
           echo "Server did not become healthy"
           exit 1
+
+  desktop-shell:
+    name: Desktop shell tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - run: cargo test --manifest-path src-tauri/Cargo.toml

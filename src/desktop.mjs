@@ -49,12 +49,14 @@ export async function launchDesktop({ workspaceRoot, port }) {
 async function findDesktopBinary() {
   const exe = process.platform === 'win32' ? 'resume-builder.exe' : 'resume-builder';
   const candidates = [
+    process.env.RESUME_BUILDER_DESKTOP,
     path.join(appRoot, 'desktop', exe),
     path.join(appRoot, 'src-tauri', 'target', 'release', exe),
     path.join(appRoot, 'src-tauri', 'target', 'debug', exe),
   ];
 
   for (const candidate of candidates) {
+    if (!candidate) continue;
     if (await exists(candidate)) return candidate;
   }
   return null;
