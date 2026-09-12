@@ -54,10 +54,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
 
+      - run: npm ci
+      - run: npm run desktop:prepare
       - run: cargo test --manifest-path src-tauri/Cargo.toml
