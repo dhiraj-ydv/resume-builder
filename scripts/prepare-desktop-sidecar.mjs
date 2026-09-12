@@ -15,7 +15,7 @@ await mkdir(runtimeRoot, { recursive: true });
 for (const entry of ['bin', 'src', 'web', 'templates', 'skills']) {
   await cp(path.join(projectRoot, entry), path.join(appRoot, entry), { recursive: true });
 }
-for (const entry of ['package.json', 'package-lock.json']) {
+for (const entry of ['package.json', 'package-lock.json', 'LICENSE', 'NOTICE', 'THIRD-PARTY-NOTICES.md']) {
   await cp(path.join(projectRoot, entry), path.join(appRoot, entry));
 }
 

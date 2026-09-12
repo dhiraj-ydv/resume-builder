@@ -29,4 +29,4 @@ node bin/resume-builder.mjs init ../resume-builder-test-workspace
 node bin/resume-builder.mjs --browser --dir ../resume-builder-test-workspace
 ```
 
-You are welcome to fork the MIT-licensed project and modify your fork for your own needs. The development instructions above are provided for that purpose.
+You are welcome to fork the Apache-2.0-licensed project and modify your fork for your own needs. The development instructions above are provided for that purpose.

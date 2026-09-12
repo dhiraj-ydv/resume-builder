@@ -308,7 +308,7 @@ External pull requests are not accepted and will be closed. Submit bug reports a
 
 ## License
 
-Resume Builder is open-source software available under the [MIT License](LICENSE).
+Resume Builder is open-source software available under the [Apache License 2.0](LICENSE). Third-party dependencies retain their own licenses; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ---
 
