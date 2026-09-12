@@ -89,7 +89,7 @@ The application never creates a Git repository in the workspace. Version control
 
 [Download Resume Builder for Windows]({{DOWNLOAD_URL}})
 
-1. Download the signed `*-setup.exe` installer.
+1. Download the `*-setup.exe` installer and its `.sha256` checksum.
 2. Run the installer for the current Windows user.
 3. Open Resume Builder from the Start menu or a newly opened terminal.
 
@@ -100,6 +100,8 @@ resume-builder
 The installer adds Resume Builder to the current user's PATH. Uninstall it from **Windows Settings > Apps**; uninstall also removes the installer-managed PATH entry and never deletes resume workspaces.
 
 Windows packages include the Node sidecar, so users do not need Node.js, npm, Microsoft Store, or another package manager.
+
+Early open-source releases may be unsigned and can display a Windows SmartScreen **Unknown publisher** warning. Verify the published SHA-256 checksum before running an unsigned installer. Code signing will be added when the project has an appropriate signing service.
 
 ### Linux
 
@@ -225,14 +227,14 @@ User data must never be added to this repository. Use a workspace outside the so
 
 ### Windows releases
 
-The [Windows desktop workflow](.github/workflows/desktop.yml) builds the signed NSIS installer when a `v*` tag is pushed or the workflow is started manually. The resulting `windows-installer` artifact is intended to be published on the product website.
+The [Windows desktop workflow](.github/workflows/desktop.yml) builds the NSIS installer when a `v*` tag is pushed or the workflow is started manually. The resulting `windows-installer` artifact and SHA-256 checksum are intended to be published on the product website.
 
-Configure these encrypted GitHub Actions secrets before producing a public build:
+Code signing is optional. With neither signing secret configured, the workflow produces an unsigned installer. If an exportable PFX certificate is available, configure both encrypted GitHub Actions secrets:
 
 - `WINDOWS_CERTIFICATE`: base64-encoded PFX code-signing certificate.
 - `WINDOWS_CERTIFICATE_PASSWORD`: PFX password.
 
-The certificate is imported only into the ephemeral GitHub-hosted runner. Tauri signs with SHA-256 and timestamps the Windows package. Certificate files and private keys must never be committed.
+If only one secret is configured, or the PFX is invalid, the workflow fails instead of silently publishing an unexpectedly unsigned build. When both are valid, the certificate is imported only into the ephemeral GitHub-hosted runner and Tauri signs and timestamps the Windows package. Certificate files and private keys must never be committed.
 
 ### Version management
 
@@ -248,7 +250,7 @@ GitHub Actions rejects a version tag that does not match the packaged version.
 
 ### Updating
 
-- **Windows:** download and run the newer signed installer over the existing installation.
+- **Windows:** download and run the newer installer over the existing installation.
 - **Linux:** pull the latest source and rerun the installer.
 
 ```bash
