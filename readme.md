@@ -2,6 +2,8 @@
 
 Build focused, ATS-friendly resumes in a private local workspace.
 
+Software built by Dhiraj Yadav for his own use, shared here for anyone who finds it useful.
+
 Resume Builder combines a desktop editor, browser UI, CLI, PDF export, and an MCP endpoint for the AI agent you choose. Your profile and resumes remain ordinary Markdown files on your computer—the application does not upload them or bundle them into its installation.
 
 [Overview](#overview) · [Features](#features) · [How it works](#how-it-works) · [Install](#install) · [CLI](#command-line) · [MCP](#connect-an-ai-agent-with-mcp) · [Privacy](#local-first-by-design) · [Development](#development) · [Releases](#releases-and-updates) · [License](#license)
@@ -302,7 +304,7 @@ Linux is distributed as source for the initial open-source launch. Build and ins
 
 ## Contributing
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Report security vulnerabilities privately according to [SECURITY.md](SECURITY.md), without attaching real resume data.
+External pull requests are not accepted and will be closed. Bug reports and focused suggestions are welcome through GitHub Issues; see [CONTRIBUTING.md](CONTRIBUTING.md). Report security vulnerabilities privately according to [SECURITY.md](SECURITY.md), without attaching real resume data.
 
 ## License
 

@@ -1,8 +1,10 @@
 # Contributing to Resume Builder
 
-Thanks for helping improve Resume Builder.
+Resume Builder is maintained as a personal open-source project. External code contributions are not currently accepted. Please do not open pull requests; they will be closed without review.
 
-## Before opening a change
+Bug reports and focused suggestions are welcome through GitHub Issues. Report security vulnerabilities privately according to `SECURITY.md`.
+
+## Project boundaries
 
 - Open an issue for substantial features or changes to workspace formats.
 - Keep application source and user workspaces separate.
@@ -27,12 +29,4 @@ node bin/resume-builder.mjs init ../resume-builder-test-workspace
 node bin/resume-builder.mjs --browser --dir ../resume-builder-test-workspace
 ```
 
-## Pull requests
-
-- Keep each pull request focused.
-- Add tests for behavior changes.
-- Describe any data-format, installation, security, or release impact.
-- Do not change version numbers in ordinary feature pull requests.
-- Confirm that no workspace or personal resume data is included.
-
-By contributing, you agree that your contribution is licensed under the MIT License.
+You are welcome to fork the MIT-licensed project and modify your fork for your own needs. The development instructions above are provided for that purpose.
