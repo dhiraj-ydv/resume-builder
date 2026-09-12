@@ -16,6 +16,7 @@ const skillName = document.querySelector('#skill-name');
 const skillCancel = document.querySelector('#skill-cancel');
 
 let saveTimer = 0;
+let updateStatusTimer = 0;
 let editorState = null;
 
 window.addEventListener('hashchange', () => {
@@ -101,8 +102,16 @@ async function checkForLatestRelease({ manual = false } = {}) {
 }
 
 function showUpdateCheckStatus(message) {
+  clearTimeout(updateStatusTimer);
+  const previousMessage = saveStatus.textContent;
+  const wasHidden = saveStatus.hidden;
   saveStatus.hidden = false;
   saveStatus.textContent = message;
+  updateStatusTimer = setTimeout(() => {
+    if (saveStatus.textContent !== message) return;
+    saveStatus.textContent = previousMessage;
+    saveStatus.hidden = wasHidden;
+  }, 4000);
 }
 
 async function render() {
