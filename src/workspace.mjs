@@ -1,6 +1,5 @@
 import { mkdir, readFile, readdir, rm, access } from 'node:fs/promises';
 import path from 'node:path';
-import { constants as fsConstants } from 'node:fs';
 import {
   excerpt,
   jsonResumeToMarkdown,
@@ -65,9 +64,11 @@ export function assertSlug(slug, kind = 'resume') {
 export async function findWorkspace(startDir) {
   const dir = path.resolve(startDir || process.cwd());
   const marker = path.join(dir, WORKSPACE_FILE);
+  let markerText;
   try {
-    await access(marker, fsConstants.R_OK);
-  } catch {
+    markerText = await readFile(marker, 'utf8');
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
     throw new WorkspaceError(
       `No resume workspace found in ${dir}. Run \`resume-builder init\` first.`,
       400,
@@ -75,7 +76,7 @@ export async function findWorkspace(startDir) {
   }
   let markerPayload;
   try {
-    markerPayload = JSON.parse(await readFile(marker, 'utf8'));
+    markerPayload = JSON.parse(markerText);
   } catch {
     throw new WorkspaceError(`Invalid ${WORKSPACE_FILE}: expected valid JSON.`);
   }

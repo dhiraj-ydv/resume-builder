@@ -191,7 +191,7 @@ Generic MCP configuration:
 }
 ```
 
-Copy the complete configuration, including the per-process token, from **Read docs** inside the running app. The CLI also prints the token when started in serve mode. The token changes whenever the server restarts; do not publish or commit it. Available MCP operations include reading and writing resumes, profile data, memory, and user-created skills. Only connect clients you trust to the local endpoint.
+Copy the complete configuration, including the per-process token, from **Read docs** inside the running app. The token changes whenever the server restarts; do not publish or commit it. Available MCP operations include reading and writing resumes, profile data, memory, and user-created skills. Only connect clients you trust to the local endpoint.
 
 ## Local-first by design
 

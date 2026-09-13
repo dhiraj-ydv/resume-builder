@@ -20,7 +20,7 @@ export async function checkLatestRelease({
   const response = await fetchImpl(RELEASES_API, {
     headers: {
       Accept: 'application/vnd.github+json',
-      'User-Agent': `resume-builder/${currentVersion}`,
+      'User-Agent': 'resume-builder',
       'X-GitHub-Api-Version': '2026-03-10',
     },
     signal: AbortSignal.timeout(5000),

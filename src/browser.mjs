@@ -1,23 +1,20 @@
-import { spawn } from 'node:child_process';
+import open from 'open';
 
 export function openBrowser(url) {
   try {
-    let child;
-    const options = { detached: true, stdio: 'ignore' };
-
-    if (process.platform === 'win32') {
-      child = spawn('cmd', ['/c', 'start', '', url], options);
-    } else if (process.platform === 'darwin') {
-      child = spawn('open', [url], options);
-    } else {
-      child = spawn('xdg-open', [url], options);
-    }
-
-    child.once('error', (error) => {
+    const localUrl = normalizeLocalAppUrl(url);
+    void open(localUrl, { wait: false }).catch((error) => {
       console.warn(`Could not open a browser: ${error.message}`);
     });
-    child.unref();
   } catch (error) {
     console.warn(`Could not open a browser: ${error.message}`);
   }
+}
+
+export function normalizeLocalAppUrl(value) {
+  const url = new URL(String(value));
+  if (url.protocol !== 'http:' || !['127.0.0.1', 'localhost'].includes(url.hostname)) {
+    throw new TypeError('Only a local Resume Builder URL can be opened.');
+  }
+  return url.href;
 }

@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { renderResume } from '../src/render.mjs';
+import { normalizeLocalAppUrl } from '../src/browser.mjs';
 import { startServer } from '../src/server.mjs';
 import { loadSkill } from '../src/skills-store.mjs';
 import { findWorkspace, initWorkspace, saveProfile } from '../src/workspace.mjs';
@@ -119,10 +120,43 @@ test('browser bootstrap exchanges its token for a strict session cookie', async 
 
     const page = await fetch(app.url, { headers: { Cookie: cookie.split(';', 1)[0] } });
     assert.equal(page.status, 200);
-    assert.match(await page.text(), new RegExp(app.apiToken));
+    assert.doesNotMatch(await page.text(), new RegExp(app.apiToken));
+
+    const browserApi = await fetch(`${app.url}api/resumes`, {
+      headers: { Cookie: cookie.split(';', 1)[0] },
+    });
+    assert.equal(browserApi.status, 200);
+
+    const missingRequestMarker = await fetch(`${app.url}api/resumes`, {
+      method: 'POST',
+      headers: {
+        Cookie: cookie.split(';', 1)[0],
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ title: 'Blocked request' }),
+    });
+    assert.equal(missingRequestMarker.status, 403);
+
+    const browserMutation = await fetch(`${app.url}api/resumes`, {
+      method: 'POST',
+      headers: {
+        Cookie: cookie.split(';', 1)[0],
+        'Content-Type': 'application/json',
+        'X-Resume-Builder-Request': '1',
+      },
+      body: JSON.stringify({ title: 'Browser request' }),
+    });
+    assert.equal(browserMutation.status, 201);
   } finally {
     await app.close();
   }
+});
+
+test('browser launcher accepts only local HTTP app URLs', () => {
+  assert.equal(normalizeLocalAppUrl('http://127.0.0.1:4173/?token=value'), 'http://127.0.0.1:4173/?token=value');
+  assert.equal(normalizeLocalAppUrl('http://localhost:4173/'), 'http://localhost:4173/');
+  assert.throws(() => normalizeLocalAppUrl('https://example.com/'), /Only a local/);
+  assert.throws(() => normalizeLocalAppUrl('file:///etc/passwd'), /Only a local/);
 });
 
 test('JSON endpoints reject the wrong content type and oversized bodies', async () => {

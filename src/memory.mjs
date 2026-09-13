@@ -1,14 +1,14 @@
-import { mkdir, readFile, access } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { atomicWriteFile } from './atomic-write.mjs';
 
 export async function loadMemory(root) {
   const file = memoryFile(root);
   try {
-    await access(file);
     const markdown = await readFile(file, 'utf8');
     return { markdown };
-  } catch {
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
     return { markdown: starterMemory() };
   }
 }

@@ -1,4 +1,3 @@
-const apiToken = document.querySelector('meta[name="resume-builder-api-token"]')?.content || '';
 if (new URLSearchParams(window.location.search).get('desktop') === '1') {
   document.documentElement.classList.add('desktop-app');
 }
@@ -629,11 +628,11 @@ function queueSave(fn) {
 }
 
 async function api(path, options = {}) {
-  const response = await fetch(path, {
+  const response = await fetch(localApiPath(path), {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      'X-Resume-Builder-Token': apiToken,
+      'X-Resume-Builder-Request': '1',
       ...(options.headers || {}),
     },
   });
@@ -641,6 +640,14 @@ async function api(path, options = {}) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
   return payload;
+}
+
+function localApiPath(value) {
+  const url = new URL(String(value), window.location.origin);
+  if (url.origin !== window.location.origin || !url.pathname.startsWith('/api/')) {
+    throw new Error('Refusing a non-local API request.');
+  }
+  return `${url.pathname}${url.search}`;
 }
 
 function escapeHtml(value) {

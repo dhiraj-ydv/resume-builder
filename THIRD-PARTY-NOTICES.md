@@ -7,6 +7,7 @@ from the Apache-2.0 license for Resume Builder itself.
 
 - `@modelcontextprotocol/sdk` — MIT
 - `marked` — MIT
+- `open` — MIT
 - `playwright` — Apache-2.0
 - `sanitize-html` — MIT
 - `zod` — MIT

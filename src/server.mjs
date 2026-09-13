@@ -1,6 +1,6 @@
 import http from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -27,7 +27,6 @@ import { checkLatestRelease, CURRENT_VERSION } from './releases.mjs';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const webDir = path.join(appRoot, 'web');
-const API_TOKEN_PLACEHOLDER = '{{RESUME_BUILDER_API_TOKEN}}';
 const MAX_JSON_BODY_BYTES = 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 15_000;
 const SECURITY_HEADERS = {
@@ -41,6 +40,10 @@ const SECURITY_HEADERS = {
 };
 const APP_CSP = "default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-ancestors 'self'; frame-src 'self'; img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'";
 const PREVIEW_CSP = "default-src 'none'; base-uri 'none'; font-src 'self'; form-action 'none'; frame-ancestors 'self'; img-src 'self' data:; object-src 'none'; script-src 'none'; style-src 'unsafe-inline'";
+const STATIC_FILES = new Map([
+  ['/app.js', 'app.js'],
+  ['/styles.css', 'styles.css'],
+]);
 
 const mimeTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
@@ -116,9 +119,13 @@ async function handle(req, res, state, port) {
     });
   }
 
-  if (protectedPath && method !== 'OPTIONS') authorizeRequest(req, state.apiToken, {
-    allowCookie: method === 'GET' && (pathname.startsWith('/preview/') || pathname.endsWith('/pdf')),
-  });
+  if (protectedPath && method !== 'OPTIONS') {
+    const browserPath = pathname.startsWith('/api/') || pathname.startsWith('/preview/');
+    authorizeRequest(req, state.apiToken, {
+      allowCookie: browserPath,
+      requireBrowserHeader: browserPath && method !== 'GET' && method !== 'HEAD',
+    });
+  }
 
   if (pathname === '/api/releases/latest' && method === 'GET') {
     try {
@@ -303,29 +310,24 @@ async function handle(req, res, state, port) {
 }
 
 async function sendStatic(req, res, pathname, requestUrl, apiToken) {
-  let requestPath = pathname === '/' ? '/index.html' : pathname;
-  const resolved = path.resolve(webDir, `.${requestPath}`);
-  const relative = path.relative(webDir, resolved);
-  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+  if (pathname.includes('\\') || pathname.split('/').includes('..')) {
     throw new WorkspaceError('Forbidden', 403);
   }
 
-  try {
-    const fileStat = await stat(resolved);
-    const filePath = fileStat.isDirectory() ? path.join(resolved, 'index.html') : resolved;
-    if (path.basename(filePath).toLowerCase() === 'index.html') {
-      return sendIndex(req, res, filePath, requestUrl, apiToken);
-    }
-    const contents = await readFile(filePath);
-    const type = mimeTypes.get(path.extname(filePath).toLowerCase()) || 'application/octet-stream';
-    res.writeHead(200, { ...SECURITY_HEADERS, 'Content-Security-Policy': APP_CSP, 'Content-Type': type });
-    res.end(contents);
-  } catch {
-    return sendIndex(req, res, path.join(webDir, 'index.html'), requestUrl, apiToken);
+  if (pathname === '/' || pathname === '/index.html') {
+    return sendIndex(req, res, requestUrl, apiToken);
   }
+
+  const staticName = STATIC_FILES.get(pathname);
+  if (!staticName) throw new WorkspaceError('Not found', 404);
+  const filePath = path.join(webDir, staticName);
+  const contents = await readFile(filePath);
+  const type = mimeTypes.get(path.extname(filePath).toLowerCase()) || 'application/octet-stream';
+  res.writeHead(200, { ...SECURITY_HEADERS, 'Content-Security-Policy': APP_CSP, 'Content-Type': type });
+  res.end(contents);
 }
 
-async function sendIndex(req, res, filePath, requestUrl, apiToken) {
+async function sendIndex(req, res, requestUrl, apiToken) {
   const suppliedToken = requestUrl.searchParams.get('token');
   if (suppliedToken !== null) {
     if (!tokensMatch(suppliedToken, apiToken)) throw new WorkspaceError('Invalid launch token.', 403);
@@ -348,8 +350,7 @@ async function sendIndex(req, res, filePath, requestUrl, apiToken) {
     return;
   }
 
-  const template = await readFile(filePath, 'utf8');
-  const html = template.replace(API_TOKEN_PLACEHOLDER, apiToken);
+  const html = await readFile(path.join(webDir, 'index.html'), 'utf8');
   res.writeHead(200, {
     ...SECURITY_HEADERS,
     'Content-Security-Policy': APP_CSP,
@@ -446,12 +447,17 @@ function assertTrustedOrigin(req, port) {
   }
 }
 
-function authorizeRequest(req, apiToken, { allowCookie = false } = {}) {
+function authorizeRequest(req, apiToken, { allowCookie = false, requireBrowserHeader = false } = {}) {
   const authorization = String(req.headers.authorization || '');
   const bearer = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
   const headerToken = String(req.headers['x-resume-builder-token'] || bearer);
   if (tokensMatch(headerToken, apiToken)) return;
-  if (allowCookie && tokensMatch(readCookie(req, 'rb_session'), apiToken)) return;
+  if (allowCookie && tokensMatch(readCookie(req, 'rb_session'), apiToken)) {
+    if (requireBrowserHeader && req.headers['x-resume-builder-request'] !== '1') {
+      throw new WorkspaceError('Browser request header required.', 403);
+    }
+    return;
+  }
   throw new WorkspaceError('Authentication required.', 401);
 }
 
