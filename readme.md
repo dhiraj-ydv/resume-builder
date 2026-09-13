@@ -137,39 +137,9 @@ Run it with:
 flatpak run io.github.exolithelabs.ResumeBuilder
 ```
 
-#### Build from source
-
-If you prefer to build the open-source project yourself, install Node.js 20+, Rust stable, and the Tauri system dependencies for your distribution. On Ubuntu or Debian:
-
-```bash
-sudo apt update
-sudo apt install build-essential pkg-config curl wget file \
-  libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
-  librsvg2-dev libssl-dev libxdo-dev patchelf
-```
-
-Clone the repository and run the Linux-only per-user installer:
-
-```bash
-git clone https://github.com/exolithelabs/resume-builder.git
-cd resume-builder
-bash scripts/install-linux.sh
-```
-
-The installer:
-
-- Builds the application from source.
-- Installs the command at `~/.local/bin/resume-builder`.
-- Places bundled resources under `~/.local/lib/resume-builder`.
-- Adds `~/.local/bin` to `~/.profile` when necessary.
-- Creates an application-menu entry and icon.
-- Does not require `sudo` after the build dependencies are installed.
-
-Start a new login session after the first installation so the PATH change is loaded.
-
 ## Command line
 
-The installed executable provides the same commands on Windows and Linux:
+The application provides the same commands on Windows and Linux:
 
 ```text
 resume-builder [dir]               Open the desktop application
@@ -177,9 +147,13 @@ resume-builder --browser [dir]     Open the localhost UI in a browser
 resume-builder serve [dir]         Start the localhost server only
 resume-builder init [dir]          Create a resume workspace
 resume-builder build [dir]         Generate PDFs for every resume
-resume-builder update              Show platform update instructions
-resume-builder uninstall           Uninstall on Linux; show Windows guidance
 resume-builder --help              Show command help
+```
+
+On Linux, pass command-line arguments to the Flatpak. For example:
+
+```bash
+flatpak run io.github.exolithelabs.ResumeBuilder --browser ~/Documents/my-resumes
 ```
 
 Examples:
@@ -283,11 +257,10 @@ GitHub Actions rejects a version tag that does not match the packaged version.
 ### Updating
 
 - **Windows:** download and run the newer installer over the existing installation.
-- **Linux:** pull the latest source and rerun the installer.
+- **Linux:** update the Flatpak through your software manager, or run:
 
 ```bash
-git pull --ff-only
-bash scripts/install-linux.sh
+flatpak update io.github.exolithelabs.ResumeBuilder
 ```
 
 The app checks GitHub's latest public release in the background and displays a dismissible notification when a newer semantic version is available. Users can also run a fresh check from **Settings > Check for updates**. This uses GitHub's public API without credentials, is cached, and never blocks offline work. Automatic download and installation through the Tauri updater are not enabled yet; that requires a final HTTPS update-manifest URL and a separate updater-signing key pair.
@@ -301,7 +274,7 @@ Use **Windows Settings > Apps > Resume Builder > Uninstall**.
 ### Linux
 
 ```bash
-resume-builder uninstall
+flatpak uninstall io.github.exolithelabs.ResumeBuilder
 ```
 
 Both uninstall paths preserve every resume workspace.
@@ -330,7 +303,7 @@ No. Application files and workspace data are deliberately stored separately.
 
 ### Where are Linux packages?
 
-Linux users can install the signed Flatpak from the [Exolithe Labs Flatpak repository](https://flatpak.exolithelabs.com/apps/io.github.exolithelabs.ResumeBuilder.flatpakref), or build and install from source with `bash scripts/install-linux.sh`.
+Linux users can install the signed Flatpak from the [Exolithe Labs Flatpak repository](https://flatpak.exolithelabs.com/apps/io.github.exolithelabs.ResumeBuilder.flatpakref). Flatpak is the only supported Linux distribution format.
 
 ## Contributing
 

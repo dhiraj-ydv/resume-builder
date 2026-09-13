@@ -447,14 +447,14 @@ async function renderDocs() {
 
       <section class="docs-section" id="docs-install">
         <h2>Install and run</h2>
-        <p>Windows users can download the signed installer from the product website; Node.js and npm are bundled. Linux users build the open-source project using the repository README.</p>
+        <p>Windows users can download the signed installer from the product website; Node.js and npm are bundled. Linux users install the signed Flatpak from the Exolithe Labs Flatpak repository.</p>
         <pre>Windows: download and run the .exe installer
-Linux: bash scripts/install-linux.sh</pre>
+Linux: flatpak install --user --from https://flatpak.exolithelabs.com/apps/io.github.exolithelabs.ResumeBuilder.flatpakref</pre>
         <ul>
           <li><code>resume-builder</code> opens the desktop window by default.</li>
           <li><code>resume-builder --browser</code> opens the same UI in a web browser.</li>
           <li><code>resume-builder serve</code> starts the server only.</li>
-          <li>On Windows, download updates from the product website. On Linux, pull the latest source and rebuild.</li>
+          <li>On Windows, download updates from the product website. On Linux, update with your software manager or <code>flatpak update io.github.exolithelabs.ResumeBuilder</code>.</li>
           <li>Removing the app does not remove your workspace.</li>
         </ul>
         <p>The UI is at <code>http://127.0.0.1:4173/</code> while the app is running.</p>

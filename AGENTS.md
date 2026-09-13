@@ -1,6 +1,6 @@
 # AGENTS.md — Resume Builder
 
-This repository is the **Resume Builder product**: a Windows direct-download desktop app and an open-source Linux build with CLI-compatible entrypoints. It is not a personal resume catalog. User profile and resume data live in a separate workspace.
+This repository is the **Resume Builder product**: a Windows direct-download desktop app and a Linux Flatpak app with CLI-compatible entrypoints. It is not a personal resume catalog. User profile and resume data live in a separate workspace.
 
 ## Product model
 
@@ -8,8 +8,8 @@ This repository is the **Resume Builder product**: a Windows direct-download des
 - `src/` is the Node CLI, workspace I/O, HTTP API, PDF export, and desktop launcher.
 - `web/` is the localhost Web UI (browser and Tauri webview).
 - `src-tauri/` is the Tauri desktop shell. Shipping packages bundle Node and the app sources as a self-contained sidecar and load `http://127.0.0.1:4173/`.
-- The signed Windows installer is produced in GitHub Actions (`.github/workflows/desktop.yml`), not locally. Linux users build the open-source project locally.
-- End-user packages are downloaded from the product website; the old npm-global/GitHub and app-store installation flows are not distribution channels.
+- The signed Windows installer is produced in GitHub Actions (`.github/workflows/desktop.yml`), not locally. Linux is distributed only as a signed Flatpak through the Exolithe Labs Flatpak repository.
+- Windows packages are downloaded from the product website. Linux packages come only from the Exolithe Labs Flatpak repository; the old npm-global and direct source-install flows are not distribution channels.
 - `templates/` renders structured JSON to print-ready HTML.
 - User data is **never** stored in this repo. It belongs in the workspace:
   - `profile.json`
@@ -21,7 +21,7 @@ Do not add personal names, employers, emails, or resume content here.
 ## Commands
 
 ```bash
-# Install on Windows from the product website, or build from source on Linux.
+# Install on Windows from the product website, or on Linux from the Exolithe Labs Flatpak repository.
 resume-builder init [dir]
 resume-builder [dir]
 resume-builder --browser [dir]
@@ -56,7 +56,7 @@ Do not invent employers, dates, metrics, technologies, credentials, or outcomes.
 - Windows is distributed as an NSIS installer
 - The Windows installer adds its install directory to the current user's PATH and removes that entry on uninstall
 - Public Windows installers are Authenticode-signed in GitHub Actions
-- Linux is installed from source with `bash scripts/install-linux.sh`; it manages the per-user executable, PATH entry, desktop entry, icon, updates, and uninstall without prebuilt packages
+- Linux is distributed only as the signed `io.github.exolithelabs.ResumeBuilder` Flatpak through the Exolithe Labs Flatpak repository
 - `init` creates a workspace outside this repo
 - First desktop launch creates a default workspace under Documents if none exists
 - Default app launch opens the Tauri desktop window
