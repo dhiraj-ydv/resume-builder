@@ -1,6 +1,6 @@
 {
   "name": "resume-builder",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "Downloadable local resume builder with desktop, browser, CLI, and MCP access.",
@@ -57,6 +57,7 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "marked": "^15.0.12",
     "playwright": "^1.55.0",
+    "sanitize-html": "^2.17.7",
     "zod": "^4.6.2"
   },
   "devDependencies": {

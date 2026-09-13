@@ -5,11 +5,12 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { listResumes, loadResume, saveResume, createResume, loadProfile, saveProfile } from './workspace.mjs';
 import { listSkills, loadSkill, createSkill, saveSkill, deleteSkill } from './skills-store.mjs';
 import { loadMemory, saveMemory, appendMemory } from './memory.mjs';
+import { CURRENT_VERSION } from './releases.mjs';
 
 export function createResumeMcpServer(workspaceRoot) {
   const server = new McpServer({
     name: 'resume-builder',
-    version: '0.1.0',
+    version: CURRENT_VERSION,
   });
 
   const text = (value) => ({
@@ -130,7 +131,8 @@ export async function handleMcpRequest(req, res, body, workspaceRoot) {
   });
 }
 
-export function mcpSnippet(url) {
+export function mcpSnippet(url, token) {
+  const headers = { Authorization: `Bearer ${token}` };
   return {
     url,
     grok: {
@@ -138,6 +140,7 @@ export function mcpSnippet(url) {
         'resume-builder': {
           type: 'http',
           url,
+          headers,
         },
       },
     },
@@ -145,6 +148,7 @@ export function mcpSnippet(url) {
       mcpServers: {
         'resume-builder': {
           url,
+          headers,
         },
       },
     },
@@ -152,10 +156,9 @@ export function mcpSnippet(url) {
       mcpServers: {
         'resume-builder': {
           url,
+          headers,
         },
       },
     },
   };
 }
-
-

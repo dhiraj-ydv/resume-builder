@@ -1,6 +1,6 @@
 [package]
 name = "resume-builder"
-version = "0.1.0"
+version = "0.1.1"
 description = "Resume Builder desktop shell"
 license = "Apache-2.0"
 authors = ["Resume Builder"]

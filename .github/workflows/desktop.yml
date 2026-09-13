@@ -13,19 +13,21 @@ jobs:
   build-windows:
     name: Windows installer
     runs-on: windows-latest
+    outputs:
+      signed: ${{ steps.windows_signing.outputs.available }}
     permissions:
-      contents: write
+      contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 20
           cache: npm
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
 
-      - uses: swatinem/rust-cache@v2
+      - uses: swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           workspaces: './src-tauri -> target'
 
@@ -83,6 +85,31 @@ jobs:
         if: steps.windows_signing.outputs.available != 'true'
         run: npm run tauri build -- --bundles nsis
 
+      - name: Verify Authenticode signatures
+        if: steps.windows_signing.outputs.available == 'true'
+        shell: pwsh
+        run: |
+          $targets = @(
+            (Get-Item src-tauri/target/release/resume-builder.exe),
+            (Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1)
+          )
+          foreach ($target in $targets) {
+            if (-not $target) { throw 'Expected signed Windows output was not created.' }
+            $signature = Get-AuthenticodeSignature -FilePath $target.FullName
+            if ($signature.Status -ne 'Valid') {
+              throw "Invalid Authenticode signature for $($target.Name): $($signature.StatusMessage)"
+            }
+          }
+
+      - name: Remove signing material from runner
+        if: always() && steps.windows_signing.outputs.available == 'true'
+        shell: pwsh
+        run: |
+          Remove-Item -LiteralPath (Join-Path $env:RUNNER_TEMP 'resume-builder-signing.pfx') -Force -ErrorAction SilentlyContinue
+          if ($env:WINDOWS_CERTIFICATE_THUMBPRINT) {
+            Remove-Item -LiteralPath "Cert:\CurrentUser\My\$env:WINDOWS_CERTIFICATE_THUMBPRINT" -Force -ErrorAction SilentlyContinue
+          }
+
       - name: Prepare stable Windows download
         shell: pwsh
         run: |
@@ -94,7 +121,7 @@ jobs:
           $hash = (Get-FileHash -Algorithm SHA256 $stableInstaller).Hash.ToLowerInvariant()
           "$hash  Resume-Builder-Windows-x64-setup.exe" | Set-Content -Encoding ascii "$stableInstaller.sha256"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: windows-installer
           path: |
@@ -102,8 +129,27 @@ jobs:
             dist/windows/Resume-Builder-Windows-x64-setup.exe.sha256
           if-no-files-found: error
 
+  publish-windows-release:
+    name: Publish signed Windows release
+    if: github.ref_type == 'tag' && needs.build-windows.outputs.signed == 'true'
+    needs: build-windows
+    runs-on: windows-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: windows-installer
+          path: dist/windows
+
+      - name: Attest Windows installer provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: dist/windows/Resume-Builder-Windows-x64-setup.exe
+
       - name: Publish GitHub Release
-        if: github.ref_type == 'tag'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -133,9 +179,11 @@ jobs:
     name: Request Flatpak publication
     if: github.ref_type == 'tag'
     needs: build-windows
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Dispatch immutable release to the Flatpak repository
         env:

@@ -1,6 +1,7 @@
 import { homedir } from 'node:os';
 import path from 'node:path';
-import { mkdir, readFile, writeFile, access } from 'node:fs/promises';
+import { mkdir, readFile, access } from 'node:fs/promises';
+import { atomicWriteFile } from './atomic-write.mjs';
 
 export function userConfigPath() {
   return path.join(homedir(), '.resume-builder', 'config.json');
@@ -26,7 +27,7 @@ export async function saveUserConfig(input) {
   };
   const file = userConfigPath();
   await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+  await atomicWriteFile(file, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
   return next;
 }
 

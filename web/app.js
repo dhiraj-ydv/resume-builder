@@ -1,3 +1,8 @@
+const apiToken = document.querySelector('meta[name="resume-builder-api-token"]')?.content || '';
+if (new URLSearchParams(window.location.search).get('desktop') === '1') {
+  document.documentElement.classList.add('desktop-app');
+}
+
 const app = document.querySelector('#app');
 const saveStatus = document.querySelector('#save-status');
 const releaseNotice = document.querySelector('#release-notice');
@@ -509,6 +514,7 @@ resumes/&lt;slug&gt;/dist/resume.pdf</pre>
         <p><code>${escapeHtml(info.url)}</code></p>
         <p>Example config:</p>
         <pre>${escapeHtml(snippet)}</pre>
+        <p>This configuration contains a private per-process bearer token. Do not publish or commit it; copy a fresh configuration after restarting Resume Builder.</p>
         <p>Tools include list/get/write for resumes, profile, skills, and memory, plus create resume, enable-aware skill listing, and PDF-related files on disk after you export.</p>
       </section>
     </article>
@@ -581,7 +587,7 @@ function paintEditor(mode) {
       ${mode === 'edit' ? `
         <textarea class="md-editor" id="markdown" spellcheck="true" aria-label="Resume Markdown">${escapeHtml(resume.markdown)}</textarea>
       ` : `
-        <iframe class="preview-frame" id="preview" title="Resume preview" src="/preview/${encodeURIComponent(slug)}?t=${Date.now()}"></iframe>
+        <iframe class="preview-frame" id="preview" title="Resume preview" sandbox="allow-popups allow-popups-to-escape-sandbox" src="/preview/${encodeURIComponent(slug)}?t=${Date.now()}"></iframe>
       `}
     </section>
   `;
@@ -624,8 +630,12 @@ function queueSave(fn) {
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Resume-Builder-Token': apiToken,
+      ...(options.headers || {}),
+    },
   });
   if (response.status === 204) return null;
   const payload = await response.json().catch(() => ({}));

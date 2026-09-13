@@ -8,6 +8,7 @@ from the Apache-2.0 license for Resume Builder itself.
 - `@modelcontextprotocol/sdk` — MIT
 - `marked` — MIT
 - `playwright` — Apache-2.0
+- `sanitize-html` — MIT
 - `zod` — MIT
 
 The desktop build also uses `@tauri-apps/cli` (Apache-2.0 OR MIT) during

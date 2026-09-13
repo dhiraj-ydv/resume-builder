@@ -25,7 +25,7 @@ html.desktop-app body {
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: "Segoe UI", system-ui, sans-serif;
   color: var(--text);
   background:
     radial-gradient(circle at top left, rgba(90, 73, 255, 0.2), transparent 30rem),
@@ -35,7 +35,7 @@ body {
 
 a { color: inherit; }
 button, input, textarea, select { font: inherit; color: inherit; }
-h1, h2, h3 { font-family: Outfit, Inter, sans-serif; letter-spacing: -0.03em; }
+h1, h2, h3 { font-family: "Segoe UI", system-ui, sans-serif; letter-spacing: -0.03em; }
 
 .topbar {
   display: flex;
@@ -50,7 +50,7 @@ h1, h2, h3 { font-family: Outfit, Inter, sans-serif; letter-spacing: -0.03em; }
   z-index: 10;
 }
 .brand {
-  font-family: Outfit, Inter, sans-serif;
+  font-family: "Segoe UI", system-ui, sans-serif;
   font-weight: 800;
   font-size: 1.15rem;
   text-decoration: none;
@@ -234,7 +234,7 @@ h1, h2, h3 { font-family: Outfit, Inter, sans-serif; letter-spacing: -0.03em; }
 }
 .resume-row:first-child { border-top: 0; }
 .resume-title {
-  font-family: Outfit, Inter, sans-serif;
+  font-family: "Segoe UI", system-ui, sans-serif;
   font-weight: 700;
   font-size: 1.05rem;
   text-decoration: none;

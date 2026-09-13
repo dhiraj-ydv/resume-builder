@@ -59,9 +59,6 @@ export function renderClassic(profile, resume, bodyHtml = '') {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${esc(name)} · ${esc(title)}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
   <style>${classicCss}</style>
 </head>
 <body>
@@ -94,14 +91,14 @@ const classicCss = `
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
-  font-family: Inter, system-ui, sans-serif;
+  font-family: "Segoe UI", system-ui, sans-serif;
   background: radial-gradient(circle at top, #ffffff 0%, #f1f5f9 60%, #e2e8f0 100%);
   color: var(--ink);
   line-height: 1.45;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
-h1, h2, h3, h4 { font-family: Outfit, Inter, sans-serif; letter-spacing: -0.02em; }
+h1, h2, h3, h4 { font-family: "Segoe UI", system-ui, sans-serif; letter-spacing: -0.02em; }
 .resume-container {
   max-width: 960px;
   margin: 24px auto;

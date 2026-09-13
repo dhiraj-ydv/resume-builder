@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rm, writeFile, access } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rm, access } from 'node:fs/promises';
 import path from 'node:path';
 import { constants as fsConstants } from 'node:fs';
 import {
@@ -10,6 +10,7 @@ import {
   starterMarkdown,
   starterProfileMarkdown,
 } from './markdown.mjs';
+import { atomicWriteFile } from './atomic-write.mjs';
 
 export const SCHEMA_VERSION = 1;
 export const WORKSPACE_FILE = 'resume-builder.json';
@@ -55,9 +56,9 @@ export function monthStamp(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
-export function assertSlug(slug) {
+export function assertSlug(slug, kind = 'resume') {
   if (!slug || !SLUG_PATTERN.test(slug)) {
-    throw new WorkspaceError(`Invalid resume slug: ${slug || '(empty)'}`);
+    throw new WorkspaceError(`Invalid ${kind} slug: ${slug || '(empty)'}`);
   }
 }
 
@@ -72,7 +73,13 @@ export async function findWorkspace(startDir) {
       400,
     );
   }
-  const markerPayload = JSON.parse(await readFile(marker, 'utf8'));
+  let markerPayload;
+  try {
+    markerPayload = JSON.parse(await readFile(marker, 'utf8'));
+  } catch {
+    throw new WorkspaceError(`Invalid ${WORKSPACE_FILE}: expected valid JSON.`);
+  }
+  markerPayload = await migrateWorkspaceMarker(marker, markerPayload);
   return { root: dir, marker: markerPayload };
 }
 
@@ -97,15 +104,15 @@ export async function initWorkspace(targetDir) {
   }
 
   if (!(await exists(profilePath)) && !(await exists(path.join(root, 'profile.json')))) {
-    await writeFile(profilePath, starterProfileMarkdown(), 'utf8');
+    await atomicWriteFile(profilePath, starterProfileMarkdown(), 'utf8');
   }
 
   if (!(await exists(readmePath))) {
-    await writeFile(readmePath, dataRepoReadme(), 'utf8');
+    await atomicWriteFile(readmePath, dataRepoReadme(), 'utf8');
   }
 
   if (!(await exists(gitignorePath))) {
-    await writeFile(gitignorePath, '*.log\n.DS_Store\nThumbs.db\nsettings.json\n', 'utf8');
+    await atomicWriteFile(gitignorePath, '*.log\n.DS_Store\nThumbs.db\nsettings.json\n', 'utf8');
   }
 
   return findWorkspace(root);
@@ -121,12 +128,12 @@ export async function loadProfile(root) {
 
   if (await exists(jsonFile)) {
     const profile = markdownToProfile(serializeProfileMarkdown(normalizeProfile(JSON.parse(await readFile(jsonFile, 'utf8')))));
-    await writeFile(mdFile, profile.markdown, 'utf8');
+    await atomicWriteFile(mdFile, profile.markdown, 'utf8');
     return profile;
   }
 
   const profile = markdownToProfile(starterProfileMarkdown());
-  await writeFile(mdFile, profile.markdown, 'utf8');
+  await atomicWriteFile(mdFile, profile.markdown, 'utf8');
   return profile;
 }
 
@@ -135,7 +142,7 @@ export async function saveProfile(root, input) {
     ? input.markdown
     : serializeProfileMarkdown({ ...emptyProfile(), ...input });
   const next = markdownToProfile(markdown);
-  await writeFile(path.join(root, 'profile.md'), next.markdown, 'utf8');
+  await atomicWriteFile(path.join(root, 'profile.md'), next.markdown, 'utf8');
   return next;
 }
 
@@ -172,7 +179,7 @@ export async function loadResume(root, slug) {
   if (await exists(jsonFile)) {
     const payload = JSON.parse(await readFile(jsonFile, 'utf8'));
     const markdown = jsonResumeToMarkdown({ ...payload, slug });
-    await writeFile(mdFile, markdown, 'utf8');
+    await atomicWriteFile(mdFile, markdown, 'utf8');
     return markdownToResume(markdown, slug);
   }
 
@@ -194,7 +201,7 @@ export async function createResume(root, input) {
   resume.updated = monthStamp();
   resume.markdown = serializeResumeMarkdown(resume);
   await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, resume.markdown, 'utf8');
+  await atomicWriteFile(file, resume.markdown, 'utf8');
   return resume;
 }
 
@@ -213,7 +220,7 @@ export async function saveResume(root, slug, input) {
   const next = markdownToResume(markdown, slug);
   next.updated = monthStamp();
   next.markdown = serializeResumeMarkdown(next);
-  await writeFile(resumeMarkdownFile(root, slug), next.markdown, 'utf8');
+  await atomicWriteFile(resumeMarkdownFile(root, slug), next.markdown, 'utf8');
   return next;
 }
 
@@ -325,7 +332,32 @@ async function exists(filePath) {
 
 async function writeJson(filePath, value) {
   await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  await atomicWriteFile(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+}
+
+async function migrateWorkspaceMarker(markerPath, payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new WorkspaceError(`Invalid ${WORKSPACE_FILE}: expected a JSON object.`);
+  }
+  const version = payload.schemaVersion ?? 0;
+  if (!Number.isInteger(version) || version < 0) {
+    throw new WorkspaceError(`Invalid ${WORKSPACE_FILE}: schemaVersion must be a non-negative integer.`);
+  }
+  if (version > SCHEMA_VERSION) {
+    throw new WorkspaceError(
+      `This workspace uses schema version ${version}, but this app supports up to ${SCHEMA_VERSION}. Update Resume Builder first.`,
+      409,
+    );
+  }
+  if (version === SCHEMA_VERSION) return payload;
+
+  const migrated = {
+    ...payload,
+    schemaVersion: SCHEMA_VERSION,
+    migrated: new Date().toISOString(),
+  };
+  await writeJson(markerPath, migrated);
+  return migrated;
 }
 
 function dataRepoReadme() {
@@ -337,7 +369,7 @@ This folder is **your resume data**, not the Resume Builder app.
 - \`memory.md\` — durable notes for the resume agent
 - \`skills/<slug>/SKILL.md\` — custom agent skills
 - \`resumes/<slug>/resume.md\` — each role-specific resume (Markdown)
-- MCP server (while the app is running): \`http://127.0.0.1:4173/mcp\`
+- MCP server (while the app is running): \`http://127.0.0.1:4173/mcp\` with the per-process bearer token shown in the app
 - Generated PDFs land in \`resumes/<slug>/dist/resume.pdf\` and \`dist/<slug>.pdf\`
 
 Edit everything in the local web UI:

@@ -1,8 +1,9 @@
-import { mkdir, readFile, readdir, rm, writeFile, access } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rm, access } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseFrontmatter } from './markdown.mjs';
-import { slugify, WorkspaceError } from './workspace.mjs';
+import { assertSlug, slugify, WorkspaceError } from './workspace.mjs';
+import { atomicWriteFile } from './atomic-write.mjs';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const builtinRoot = path.join(appRoot, 'skills');
@@ -22,6 +23,7 @@ export async function listSkills(workspaceRoot, { includeDisabled = true } = {})
 }
 
 export async function loadSkill(workspaceRoot, slug) {
+  assertSlug(slug, 'skill');
   const disabled = await loadDisabled(workspaceRoot);
   const userFile = path.join(workspaceRoot, 'skills', slug, 'SKILL.md');
   if (await exists(userFile)) {
@@ -35,6 +37,7 @@ export async function loadSkill(workspaceRoot, slug) {
 }
 
 export async function setSkillEnabled(workspaceRoot, slug, enabled) {
+  assertSlug(slug, 'skill');
   await loadSkill(workspaceRoot, slug);
   const disabled = await loadDisabled(workspaceRoot);
   if (enabled) disabled.delete(slug);
@@ -47,7 +50,7 @@ export async function createSkill(workspaceRoot, input) {
   const name = String(input?.name || '').trim();
   if (!name) throw new WorkspaceError('A skill name is required.');
   const slug = slugify(input.slug || name);
-  if (!slug) throw new WorkspaceError('Invalid skill name.');
+  assertSlug(slug, 'skill');
   const builtinFile = path.join(builtinRoot, slug, 'SKILL.md');
   if (await exists(builtinFile)) {
     throw new WorkspaceError(`"${slug}" is a built-in skill. Choose another name.`, 409);
@@ -56,11 +59,12 @@ export async function createSkill(workspaceRoot, input) {
   if (await exists(file)) throw new WorkspaceError(`Skill already exists: ${slug}`, 409);
   const markdown = String(input.markdown || '').trim() || starterSkill(name);
   await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, markdown, 'utf8');
+  await atomicWriteFile(file, markdown, 'utf8');
   return parseSkillFile(file, slug, 'user');
 }
 
 export async function saveSkill(workspaceRoot, slug, input) {
+  assertSlug(slug, 'skill');
   const current = await loadSkill(workspaceRoot, slug);
   if (current.source === 'builtin') {
     throw new WorkspaceError('Built-in skills cannot be edited. Duplicate it as a custom skill.', 403);
@@ -68,11 +72,12 @@ export async function saveSkill(workspaceRoot, slug, input) {
   const markdown = String(input?.markdown || '').trim();
   if (!markdown) throw new WorkspaceError('Skill Markdown is required.');
   const file = path.join(workspaceRoot, 'skills', slug, 'SKILL.md');
-  await writeFile(file, markdown, 'utf8');
+  await atomicWriteFile(file, markdown, 'utf8');
   return parseSkillFile(file, slug, 'user');
 }
 
 export async function deleteSkill(workspaceRoot, slug) {
+  assertSlug(slug, 'skill');
   const current = await loadSkill(workspaceRoot, slug);
   if (current.source === 'builtin') {
     throw new WorkspaceError('Built-in skills cannot be deleted.', 403);
@@ -90,6 +95,7 @@ async function readSkillDir(dir, source) {
   const skills = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(entry.name)) continue;
     try {
       skills.push(await parseSkillFile(path.join(dir, entry.name, 'SKILL.md'), entry.name, source));
     } catch {
@@ -143,7 +149,7 @@ async function loadDisabled(workspaceRoot) {
 async function saveDisabled(workspaceRoot, disabled) {
   const file = disabledFile(workspaceRoot);
   await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, `${JSON.stringify({ disabled: [...disabled].sort() }, null, 2)}\n`, 'utf8');
+  await atomicWriteFile(file, `${JSON.stringify({ disabled: [...disabled].sort() }, null, 2)}\n`, 'utf8');
 }
 
 async function exists(filePath) {

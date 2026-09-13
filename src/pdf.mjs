@@ -27,6 +27,12 @@ export async function writeResumePdf(root, slug, html) {
       viewport: { width: 1440, height: 2200 },
       deviceScaleFactor: 1,
     });
+    await page.setJavaScriptEnabled(false);
+    await page.route('**/*', (route) => {
+      const url = route.request().url();
+      if (url === 'about:blank' || url.startsWith('data:')) return route.continue();
+      return route.abort('blockedbyclient');
+    });
     await page.setContent(html, { waitUntil: 'networkidle' });
     await page.emulateMedia({ media: 'print' });
     await page.pdf({

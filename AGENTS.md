@@ -61,7 +61,7 @@ Do not invent employers, dates, metrics, technologies, credentials, or outcomes.
 - First desktop launch creates a default workspace under Documents if none exists
 - Default app launch opens the Tauri desktop window
 - `--browser` still serves the same UI on localhost
-- While running, MCP is at `http://127.0.0.1:4173/mcp` for external agents
+- While running, MCP is at `http://127.0.0.1:4173/mcp` for external agents and requires the per-process bearer token shown in the app
 - Website download packages come from the Desktop downloads GitHub Actions workflow
 - Tagged Windows builds publish a GitHub Release, and the app checks that public release feed for newer-version notifications
 - A successful tagged release dispatches its immutable commit and version to the shared Flatpak repository for automatic Linux publication

@@ -1,5 +1,6 @@
-import { mkdir, readFile, writeFile, access } from 'node:fs/promises';
+import { mkdir, readFile, access } from 'node:fs/promises';
 import path from 'node:path';
+import { atomicWriteFile } from './atomic-write.mjs';
 
 export async function loadMemory(root) {
   const file = memoryFile(root);
@@ -15,7 +16,7 @@ export async function loadMemory(root) {
 export async function saveMemory(root, input) {
   const markdown = typeof input?.markdown === 'string' ? input.markdown : starterMemory();
   await mkdir(root, { recursive: true });
-  await writeFile(memoryFile(root), markdown, 'utf8');
+  await atomicWriteFile(memoryFile(root), markdown, 'utf8');
   return { markdown };
 }
 

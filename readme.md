@@ -182,17 +182,21 @@ Generic MCP configuration:
 {
   "mcpServers": {
     "resume-builder": {
-      "url": "http://127.0.0.1:4173/mcp"
+      "url": "http://127.0.0.1:4173/mcp",
+      "headers": {
+        "Authorization": "Bearer <token shown by Resume Builder>"
+      }
     }
   }
 }
 ```
 
-Available MCP operations include reading and writing resumes, profile data, memory, and user-created skills. Only connect clients you trust to the local endpoint.
+Copy the complete configuration, including the per-process token, from **Read docs** inside the running app. The CLI also prints the token when started in serve mode. The token changes whenever the server restarts; do not publish or commit it. Available MCP operations include reading and writing resumes, profile data, memory, and user-created skills. Only connect clients you trust to the local endpoint.
 
 ## Local-first by design
 
 - The server binds to `127.0.0.1`, not the public network.
+- Local API and MCP requests require a random per-process token and reject untrusted Host and Origin headers.
 - Resume data is stored in a user-selected workspace, never in this repository or the app installation.
 - Removing or upgrading the application does not remove workspaces.
 - The application contains no LLM credentials and does not choose an AI provider for the user.
@@ -233,14 +237,14 @@ User data must never be added to this repository. Use a workspace outside the so
 
 ### Windows releases
 
-The [Windows desktop workflow](.github/workflows/desktop.yml) builds the NSIS installer when a `v*` tag is pushed or the workflow is started manually. Tagged builds publish a non-draft GitHub Release containing stable installer and checksum filenames, allowing the README and product website to use permanent latest-release download links.
+The [Windows desktop workflow](.github/workflows/desktop.yml) builds the NSIS installer when a `v*` tag is pushed or the workflow is started manually. Signed tagged builds publish a non-draft GitHub Release containing stable installer and checksum filenames, allowing the README and product website to use permanent latest-release download links.
 
-Code signing is optional. With neither signing secret configured, the workflow produces an unsigned installer. If an exportable PFX certificate is available, configure both encrypted GitHub Actions secrets:
+Manual workflow runs may produce an unsigned test artifact, but tagged public releases are blocked unless Authenticode signing is configured. Configure both encrypted GitHub Actions secrets using an exportable PFX code-signing certificate:
 
 - `WINDOWS_CERTIFICATE`: base64-encoded PFX code-signing certificate.
 - `WINDOWS_CERTIFICATE_PASSWORD`: PFX password.
 
-If only one secret is configured, or the PFX is invalid, the workflow fails instead of silently publishing an unexpectedly unsigned build. When both are valid, the certificate is imported only into the ephemeral GitHub-hosted runner and Tauri signs and timestamps the Windows package. Certificate files and private keys must never be committed.
+If both secrets are absent, the workflow may retain an unsigned test artifact but skips Windows release publication. If only one secret is present or the PFX is invalid, the build fails. When both are valid, the certificate is imported only into the ephemeral GitHub-hosted runner and Tauri signs and timestamps the Windows package. Published installers also receive a GitHub build-provenance attestation. Certificate files and private keys must never be committed.
 
 ### Linux releases
 

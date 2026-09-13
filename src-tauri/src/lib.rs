@@ -27,8 +27,9 @@ pub fn run() {
                 .unwrap_or(4173);
             let port = available_port(preferred_port)?.to_string();
             let launch_token = Uuid::new_v4().to_string();
-            let url = format!("http://127.0.0.1:{port}/?desktop=1");
-            let mut sidecar = spawn_node_sidecar(app.handle(), &port, &launch_token)?;
+            let api_token = Uuid::new_v4().to_string();
+            let url = format!("http://127.0.0.1:{port}/?desktop=1&token={api_token}");
+            let mut sidecar = spawn_node_sidecar(app.handle(), &port, &launch_token, &api_token)?;
 
             if !wait_for_sidecar(&port, &launch_token, &mut sidecar, Duration::from_secs(20)) {
                 let _ = sidecar.kill();
@@ -47,9 +48,7 @@ pub fn run() {
 
             #[cfg(target_os = "windows")]
             {
-                builder = builder.additional_browser_args(
-                    "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection",
-                );
+                builder = builder.additional_browser_args("--disable-features=msWebOOUI,msPdfOOUI");
             }
 
             builder.build()?;
@@ -89,6 +88,7 @@ fn spawn_node_sidecar(
     app: &tauri::AppHandle,
     port: &str,
     launch_token: &str,
+    api_token: &str,
 ) -> Result<Child, Box<dyn std::error::Error>> {
     let (node, cli) = sidecar_paths(app)?;
     let workspace = std::env::var("RESUME_BUILDER_WORKSPACE").ok();
@@ -98,6 +98,7 @@ fn spawn_node_sidecar(
         .arg(cli)
         .args(["serve", "--sidecar", "--port", port])
         .env("RESUME_BUILDER_LAUNCH_TOKEN", launch_token)
+        .env("RESUME_BUILDER_API_TOKEN", api_token)
         .stdin(Stdio::null())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit());

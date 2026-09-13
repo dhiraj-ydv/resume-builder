@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +27,20 @@ import { checkLatestRelease, CURRENT_VERSION } from './releases.mjs';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const webDir = path.join(appRoot, 'web');
+const API_TOKEN_PLACEHOLDER = '{{RESUME_BUILDER_API_TOKEN}}';
+const MAX_JSON_BODY_BYTES = 1024 * 1024;
+const REQUEST_TIMEOUT_MS = 15_000;
+const SECURITY_HEADERS = {
+  'Cache-Control': 'no-store',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Resource-Policy': 'same-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+  'Referrer-Policy': 'no-referrer',
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'SAMEORIGIN',
+};
+const APP_CSP = "default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-ancestors 'self'; frame-src 'self'; img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'";
+const PREVIEW_CSP = "default-src 'none'; base-uri 'none'; font-src 'self'; form-action 'none'; frame-ancestors 'self'; img-src 'self' data:; object-src 'none'; script-src 'none'; style-src 'unsafe-inline'";
 
 const mimeTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
@@ -40,16 +55,29 @@ const mimeTypes = new Map([
   ['.woff2', 'font/woff2'],
 ]);
 
-export function startServer({ workspaceRoot, port }) {
+export function startServer({
+  workspaceRoot,
+  port,
+  apiToken: suppliedApiToken,
+  launchToken: suppliedLaunchToken,
+}) {
+  const configuredToken = suppliedApiToken || process.env.RESUME_BUILDER_API_TOKEN || '';
+  if (configuredToken && !/^[A-Za-z0-9_-]{32,128}$/.test(configuredToken)) {
+    throw new WorkspaceError('RESUME_BUILDER_API_TOKEN must be a 32-128 character URL-safe token.');
+  }
+  const apiToken = configuredToken || randomBytes(32).toString('base64url');
   const state = {
     workspaceRoot,
-    launchToken: process.env.RESUME_BUILDER_LAUNCH_TOKEN || '',
+    launchToken: suppliedLaunchToken || process.env.RESUME_BUILDER_LAUNCH_TOKEN || '',
+    apiToken,
   };
   const server = http.createServer((req, res) => {
     handle(req, res, state, port).catch((error) => {
       sendError(res, error);
     });
   });
+  server.requestTimeout = REQUEST_TIMEOUT_MS;
+  server.headersTimeout = REQUEST_TIMEOUT_MS;
 
   return new Promise((resolve, reject) => {
     server.once('error', reject);
@@ -57,7 +85,9 @@ export function startServer({ workspaceRoot, port }) {
       resolve({
         server,
         url: `http://127.0.0.1:${port}/`,
+        launchUrl: `http://127.0.0.1:${port}/?token=${encodeURIComponent(apiToken)}`,
         mcpUrl: `http://127.0.0.1:${port}/mcp`,
+        apiToken,
       });
     });
   });
@@ -67,7 +97,16 @@ async function handle(req, res, state, port) {
   const workspaceRoot = state.workspaceRoot;
   const requestUrl = new URL(req.url || '/', 'http://127.0.0.1');
   const method = req.method || 'GET';
-  const pathname = decodeURIComponent(requestUrl.pathname);
+  let pathname;
+  try {
+    pathname = decodeURIComponent(requestUrl.pathname);
+  } catch {
+    throw new WorkspaceError('Invalid URL encoding.');
+  }
+
+  assertTrustedHost(req, port);
+  const protectedPath = pathname.startsWith('/api/') || pathname === '/mcp' || pathname.startsWith('/preview/');
+  if (protectedPath) assertTrustedOrigin(req, port);
 
   if (pathname === '/api/health' && method === 'GET') {
     return sendJson(res, {
@@ -76,6 +115,10 @@ async function handle(req, res, state, port) {
       launchToken: state.launchToken,
     });
   }
+
+  if (protectedPath && method !== 'OPTIONS') authorizeRequest(req, state.apiToken, {
+    allowCookie: method === 'GET' && (pathname.startsWith('/preview/') || pathname.endsWith('/pdf')),
+  });
 
   if (pathname === '/api/releases/latest' && method === 'GET') {
     try {
@@ -97,7 +140,7 @@ async function handle(req, res, state, port) {
     const hash = typeof body.hash === 'string' && /^#\/[A-Za-z0-9_~./-]*$/.test(body.hash)
       ? body.hash
       : '';
-    openBrowser(`http://127.0.0.1:${port}/${hash}`);
+    openBrowser(`http://127.0.0.1:${port}/?token=${encodeURIComponent(state.apiToken)}${hash}`);
     return sendJson(res, { ok: true });
   }
 
@@ -140,13 +183,15 @@ async function handle(req, res, state, port) {
   }
 
   if (pathname === '/api/mcp' && method === 'GET') {
-    return sendJson(res, mcpSnippet(`http://127.0.0.1:${port}/mcp`));
+    return sendJson(res, mcpSnippet(`http://127.0.0.1:${port}/mcp`, state.apiToken));
   }
 
   if (pathname === '/mcp' && method === 'OPTIONS') {
+    const origin = req.headers.origin;
     res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'content-type, mcp-session-id, mcp-protocol-version',
+      ...SECURITY_HEADERS,
+      ...(origin ? { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' } : {}),
+      'Access-Control-Allow-Headers': 'authorization, content-type, mcp-session-id, mcp-protocol-version, x-resume-builder-token',
       'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     });
     res.end();
@@ -155,6 +200,7 @@ async function handle(req, res, state, port) {
 
   if (pathname === '/mcp') {
     const body = method === 'POST' ? await readJson(req) : undefined;
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
     return handleMcpRequest(req, res, body, workspaceRoot);
   }
 
@@ -246,41 +292,78 @@ async function handle(req, res, state, port) {
     const slug = decodeURIComponent(previewMatch[1]);
     const profile = await loadProfile(workspaceRoot);
     const resume = await loadResume(workspaceRoot, slug);
-    return sendHtml(res, renderResume(profile, resume));
+    return sendHtml(res, renderResume(profile, resume), { csp: PREVIEW_CSP });
   }
 
   if (method === 'GET') {
-    return sendStatic(res, pathname);
+    return sendStatic(req, res, pathname, requestUrl, state.apiToken);
   }
 
   throw new WorkspaceError('Not found', 404);
 }
 
-async function sendStatic(res, pathname) {
+async function sendStatic(req, res, pathname, requestUrl, apiToken) {
   let requestPath = pathname === '/' ? '/index.html' : pathname;
   const resolved = path.resolve(webDir, `.${requestPath}`);
-  if (!resolved.startsWith(webDir)) {
+  const relative = path.relative(webDir, resolved);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
     throw new WorkspaceError('Forbidden', 403);
   }
 
   try {
     const fileStat = await stat(resolved);
     const filePath = fileStat.isDirectory() ? path.join(resolved, 'index.html') : resolved;
+    if (path.basename(filePath).toLowerCase() === 'index.html') {
+      return sendIndex(req, res, filePath, requestUrl, apiToken);
+    }
     const contents = await readFile(filePath);
     const type = mimeTypes.get(path.extname(filePath).toLowerCase()) || 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': type });
+    res.writeHead(200, { ...SECURITY_HEADERS, 'Content-Security-Policy': APP_CSP, 'Content-Type': type });
     res.end(contents);
   } catch {
-    const index = await readFile(path.join(webDir, 'index.html'));
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(index);
+    return sendIndex(req, res, path.join(webDir, 'index.html'), requestUrl, apiToken);
   }
+}
+
+async function sendIndex(req, res, filePath, requestUrl, apiToken) {
+  const suppliedToken = requestUrl.searchParams.get('token');
+  if (suppliedToken !== null) {
+    if (!tokensMatch(suppliedToken, apiToken)) throw new WorkspaceError('Invalid launch token.', 403);
+    const redirectUrl = new URL(requestUrl.pathname, 'http://127.0.0.1');
+    for (const [key, value] of requestUrl.searchParams) {
+      if (key !== 'token') redirectUrl.searchParams.append(key, value);
+    }
+    res.writeHead(302, {
+      ...SECURITY_HEADERS,
+      Location: `${redirectUrl.pathname}${redirectUrl.search}`,
+      'Set-Cookie': sessionCookie(apiToken),
+    });
+    res.end();
+    return;
+  }
+
+  if (!tokensMatch(readCookie(req, 'rb_session'), apiToken)) {
+    res.writeHead(401, { ...SECURITY_HEADERS, 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Resume Builder must be opened from the desktop app or CLI launch URL.');
+    return;
+  }
+
+  const template = await readFile(filePath, 'utf8');
+  const html = template.replace(API_TOKEN_PLACEHOLDER, apiToken);
+  res.writeHead(200, {
+    ...SECURITY_HEADERS,
+    'Content-Security-Policy': APP_CSP,
+    'Content-Type': 'text/html; charset=utf-8',
+    'Set-Cookie': sessionCookie(apiToken),
+  });
+  res.end(html);
 }
 
 async function sendFile(res, filePath, { downloadName } = {}) {
   try {
     const contents = await readFile(filePath);
     const headers = {
+      ...SECURITY_HEADERS,
       'Content-Type': 'application/pdf',
     };
     if (downloadName) {
@@ -296,14 +379,19 @@ async function sendFile(res, filePath, { downloadName } = {}) {
 function sendJson(res, payload) {
   const body = JSON.stringify(payload);
   res.writeHead(res.statusCode || 200, {
+    ...SECURITY_HEADERS,
     'Content-Type': 'application/json; charset=utf-8',
     'Content-Length': Buffer.byteLength(body),
   });
   res.end(body);
 }
 
-function sendHtml(res, html) {
-  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+function sendHtml(res, html, { csp = APP_CSP } = {}) {
+  res.writeHead(200, {
+    ...SECURITY_HEADERS,
+    'Content-Security-Policy': csp,
+    'Content-Type': 'text/html; charset=utf-8',
+  });
   res.end(html);
 }
 
@@ -311,13 +399,28 @@ function sendError(res, error) {
   const status = error instanceof WorkspaceError ? error.status : 500;
   const message = error instanceof WorkspaceError ? error.message : 'Internal server error';
   if (status >= 500) console.error(error);
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.writeHead(status, { ...SECURITY_HEADERS, 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify({ error: message }));
 }
 
 async function readJson(req) {
+  const contentType = String(req.headers['content-type'] || '').split(';', 1)[0].trim().toLowerCase();
+  if (contentType !== 'application/json') {
+    throw new WorkspaceError('Content-Type must be application/json.', 415);
+  }
+  const announcedLength = Number(req.headers['content-length'] || 0);
+  if (Number.isFinite(announcedLength) && announcedLength > MAX_JSON_BODY_BYTES) {
+    throw new WorkspaceError('Request body is too large.', 413);
+  }
   const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
+  let length = 0;
+  for await (const chunk of req) {
+    length += chunk.length;
+    if (length > MAX_JSON_BODY_BYTES) {
+      throw new WorkspaceError('Request body is too large.', 413);
+    }
+    chunks.push(chunk);
+  }
   const raw = Buffer.concat(chunks).toString('utf8');
   if (!raw.trim()) return {};
   try {
@@ -325,4 +428,50 @@ async function readJson(req) {
   } catch {
     throw new WorkspaceError('Invalid JSON body');
   }
+}
+
+function assertTrustedHost(req, port) {
+  const host = String(req.headers.host || '').toLowerCase();
+  if (host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) {
+    throw new WorkspaceError('Untrusted host.', 403);
+  }
+}
+
+function assertTrustedOrigin(req, port) {
+  const origin = req.headers.origin;
+  const allowed = new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`]);
+  if (origin && !allowed.has(origin)) throw new WorkspaceError('Cross-origin requests are not allowed.', 403);
+  if (req.headers['sec-fetch-site'] === 'cross-site') {
+    throw new WorkspaceError('Cross-site requests are not allowed.', 403);
+  }
+}
+
+function authorizeRequest(req, apiToken, { allowCookie = false } = {}) {
+  const authorization = String(req.headers.authorization || '');
+  const bearer = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+  const headerToken = String(req.headers['x-resume-builder-token'] || bearer);
+  if (tokensMatch(headerToken, apiToken)) return;
+  if (allowCookie && tokensMatch(readCookie(req, 'rb_session'), apiToken)) return;
+  throw new WorkspaceError('Authentication required.', 401);
+}
+
+function tokensMatch(candidate, expected) {
+  if (!candidate || !expected) return false;
+  const left = Buffer.from(String(candidate));
+  const right = Buffer.from(String(expected));
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
+function readCookie(req, name) {
+  const cookies = String(req.headers.cookie || '').split(';');
+  for (const cookie of cookies) {
+    const index = cookie.indexOf('=');
+    if (index === -1) continue;
+    if (cookie.slice(0, index).trim() === name) return cookie.slice(index + 1).trim();
+  }
+  return '';
+}
+
+function sessionCookie(apiToken) {
+  return `rb_session=${apiToken}; HttpOnly; SameSite=Strict; Path=/`;
 }

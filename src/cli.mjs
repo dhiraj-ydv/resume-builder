@@ -51,9 +51,9 @@ try {
         await serveWorkspace(workspace, args.port, true);
       } catch (serveError) {
         if (String(serveError.message || serveError).includes('EADDRINUSE')) {
-          const url = `http://127.0.0.1:${args.port}/`;
-          console.log(`Web UI already running at ${url}`);
-          openBrowser(url);
+          throw new WorkspaceError(
+            `Port ${args.port} is already in use. Refusing to open an unverified local service; choose another port with --port.`,
+          );
         } else {
           throw serveError;
         }
@@ -61,7 +61,7 @@ try {
     }
   } else if (args.command === 'serve') {
     const workspace = await resolveWorkspace(args.dir, { createDefault: createDefaultWorkspace });
-    await serveWorkspace(workspace, args.port, args.open);
+    await serveWorkspace(workspace, args.port, args.open, { printToken: !args.sidecar });
   } else if (args.command === 'build') {
     const workspace = await resolveWorkspace(args.dir, { createDefault: createDefaultWorkspace });
     const profile = await loadProfile(workspace.root);
@@ -86,8 +86,8 @@ try {
   process.exit(1);
 }
 
-async function serveWorkspace(workspace, port, open) {
-  const { url } = await startServer({
+async function serveWorkspace(workspace, port, open, { printToken = true } = {}) {
+  const { url, launchUrl, apiToken } = await startServer({
     workspaceRoot: workspace.root,
     port,
   });
@@ -95,7 +95,8 @@ async function serveWorkspace(workspace, port, open) {
   console.log(`Workspace: ${workspace.root}`);
   console.log(`Web UI:    ${url}`);
   console.log(`MCP:       ${url.replace(/\/$/, '')}/mcp`);
-  if (open) openBrowser(url);
+  if (printToken) console.log(`MCP token: ${apiToken}`);
+  if (open) openBrowser(launchUrl);
 }
 
 async function resolveWorkspace(dir, { createDefault = false } = {}) {
