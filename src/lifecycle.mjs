@@ -1,5 +1,6 @@
 export const PACKAGE_NAME = 'resume-builder';
-export const DOWNLOAD_URL = process.env.RESUME_BUILDER_DOWNLOAD_URL || '<DOWNLOAD_URL>';
+export const DOWNLOAD_URL = process.env.RESUME_BUILDER_DOWNLOAD_URL
+  || 'https://github.com/exolithelabs/resume-builder/releases/latest/download/Resume-Builder-Windows-x64-setup.exe';
 export const FLATPAK_APP_ID = 'io.github.exolithelabs.ResumeBuilder';
 export const FLATPAK_REF_URL = `https://flatpak.exolithelabs.com/apps/${FLATPAK_APP_ID}.flatpakref`;
 

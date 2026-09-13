@@ -83,20 +83,23 @@ jobs:
         if: steps.windows_signing.outputs.available != 'true'
         run: npm run tauri build -- --bundles nsis
 
-      - name: Create installer checksum
+      - name: Prepare stable Windows download
         shell: pwsh
         run: |
           $installer = Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
           if (-not $installer) { throw 'Windows installer was not created.' }
-          $hash = (Get-FileHash -Algorithm SHA256 $installer.FullName).Hash.ToLowerInvariant()
-          "$hash  $($installer.Name)" | Set-Content -Encoding ascii "$($installer.FullName).sha256"
+          $downloadDirectory = New-Item -ItemType Directory -Force dist/windows
+          $stableInstaller = Join-Path $downloadDirectory.FullName 'Resume-Builder-Windows-x64-setup.exe'
+          Copy-Item -LiteralPath $installer.FullName -Destination $stableInstaller
+          $hash = (Get-FileHash -Algorithm SHA256 $stableInstaller).Hash.ToLowerInvariant()
+          "$hash  Resume-Builder-Windows-x64-setup.exe" | Set-Content -Encoding ascii "$stableInstaller.sha256"
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows-installer
           path: |
-            src-tauri/target/release/bundle/nsis/*-setup.exe
-            src-tauri/target/release/bundle/nsis/*-setup.exe.sha256
+            dist/windows/Resume-Builder-Windows-x64-setup.exe
+            dist/windows/Resume-Builder-Windows-x64-setup.exe.sha256
           if-no-files-found: error
 
       - name: Publish GitHub Release
@@ -105,14 +108,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $installer = Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
-          $checksum = Get-Item "$($installer.FullName).sha256"
+          $installer = Get-Item dist/windows/Resume-Builder-Windows-x64-setup.exe
+          $checksum = Get-Item dist/windows/Resume-Builder-Windows-x64-setup.exe.sha256
           gh release view $env:GITHUB_REF_NAME *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $env:GITHUB_REF_NAME $installer.FullName $checksum.FullName --clobber
           } else {
             gh release create $env:GITHUB_REF_NAME $installer.FullName $checksum.FullName --verify-tag --generate-notes --title "Resume Builder $env:GITHUB_REF_NAME"
           }
+          gh release edit $env:GITHUB_REF_NAME --draft=false --prerelease=false --latest
 
   publish-flatpak:
     name: Request Flatpak publication

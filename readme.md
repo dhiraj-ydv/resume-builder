@@ -87,7 +87,9 @@ The application never creates a Git repository in the workspace. Version control
 
 ### Windows
 
-[Download Resume Builder for Windows](https://github.com/exolithelabs/resume-builder/releases)
+[Download Resume Builder for Windows](https://github.com/exolithelabs/resume-builder/releases/latest/download/Resume-Builder-Windows-x64-setup.exe)
+
+[Download the SHA-256 checksum](https://github.com/exolithelabs/resume-builder/releases/latest/download/Resume-Builder-Windows-x64-setup.exe.sha256)
 
 1. Download the `*-setup.exe` installer and its `.sha256` checksum.
 2. Run the installer for the current Windows user.
@@ -231,7 +233,7 @@ User data must never be added to this repository. Use a workspace outside the so
 
 ### Windows releases
 
-The [Windows desktop workflow](.github/workflows/desktop.yml) builds the NSIS installer when a `v*` tag is pushed or the workflow is started manually. The resulting `windows-installer` artifact and SHA-256 checksum are intended to be published on the product website.
+The [Windows desktop workflow](.github/workflows/desktop.yml) builds the NSIS installer when a `v*` tag is pushed or the workflow is started manually. Tagged builds publish a non-draft GitHub Release containing stable installer and checksum filenames, allowing the README and product website to use permanent latest-release download links.
 
 Code signing is optional. With neither signing secret configured, the workflow produces an unsigned installer. If an exportable PFX certificate is available, configure both encrypted GitHub Actions secrets:
 
