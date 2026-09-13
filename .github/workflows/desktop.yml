@@ -116,7 +116,18 @@ jobs:
           } else {
             gh release create $env:GITHUB_REF_NAME $installer.FullName $checksum.FullName --verify-tag --generate-notes --title "Resume Builder $env:GITHUB_REF_NAME"
           }
-          gh release edit $env:GITHUB_REF_NAME --draft=false --prerelease=false --latest
+          $allowedAssets = @(
+            'Resume-Builder-Windows-x64-setup.exe',
+            'Resume-Builder-Windows-x64-setup.exe.sha256'
+          )
+          $releaseAssets = gh release view $env:GITHUB_REF_NAME --json assets --jq '.assets[].name'
+          foreach ($asset in $releaseAssets) {
+            if ($asset -and $asset -notin $allowedAssets) {
+              gh release delete-asset $env:GITHUB_REF_NAME $asset --yes
+              if ($LASTEXITCODE -ne 0) { throw "Could not remove obsolete release asset: $asset" }
+            }
+          }
+          gh release edit $env:GITHUB_REF_NAME --target $env:GITHUB_SHA --verify-tag --draft=false --prerelease=false --latest
 
   publish-flatpak:
     name: Request Flatpak publication
