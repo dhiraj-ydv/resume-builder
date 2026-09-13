@@ -148,6 +148,14 @@ test('browser bootstrap exchanges its token for a strict session cookie', async 
       body: JSON.stringify({ title: 'Browser request' }),
     });
     assert.equal(browserMutation.status, 201);
+
+    const fixedResumeRoute = await fetch(`${app.url}api/resume`, {
+      headers: {
+        Cookie: cookie.split(';', 1)[0],
+        'X-Resume-Builder-Slug': 'browser-request',
+      },
+    });
+    assert.equal(fixedResumeRoute.status, 200);
   } finally {
     await app.close();
   }

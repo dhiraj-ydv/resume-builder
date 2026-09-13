@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   WorkspaceError,
+  assertSlug,
   loadProfile,
   saveProfile,
   listResumes,
@@ -234,15 +235,19 @@ async function handle(req, res, state, port) {
   }
 
   const skillEnabledMatch = pathname.match(/^\/api\/skills\/([^/]+)\/enabled$/);
-  if (skillEnabledMatch && method === 'PUT') {
-    const slug = decodeURIComponent(skillEnabledMatch[1]);
+  if ((pathname === '/api/skill/enabled' || skillEnabledMatch) && method === 'PUT') {
+    const slug = pathname === '/api/skill/enabled'
+      ? requestSlug(req, 'skill')
+      : decodeURIComponent(skillEnabledMatch[1]);
     const body = await readJson(req);
     return sendJson(res, await setSkillEnabled(workspaceRoot, slug, body.enabled !== false));
   }
 
   const skillMatch = pathname.match(/^\/api\/skills\/([^/]+)$/);
-  if (skillMatch) {
-    const slug = decodeURIComponent(skillMatch[1]);
+  if (pathname === '/api/skill' || skillMatch) {
+    const slug = pathname === '/api/skill'
+      ? requestSlug(req, 'skill')
+      : decodeURIComponent(skillMatch[1]);
     if (method === 'GET') return sendJson(res, await loadSkill(workspaceRoot, slug));
     if (method === 'PUT') {
       const body = await readJson(req);
@@ -267,9 +272,11 @@ async function handle(req, res, state, port) {
   }
 
   const resumeMatch = pathname.match(/^\/api\/resumes\/([^/]+)(?:\/(pdf))?$/);
-  if (resumeMatch) {
-    const slug = decodeURIComponent(resumeMatch[1]);
-    const pdf = resumeMatch[2] === 'pdf';
+  if (pathname === '/api/resume' || pathname === '/api/resume/pdf' || resumeMatch) {
+    const slug = pathname === '/api/resume' || pathname === '/api/resume/pdf'
+      ? requestSlug(req, 'resume')
+      : decodeURIComponent(resumeMatch[1]);
+    const pdf = pathname === '/api/resume/pdf' || resumeMatch?.[2] === 'pdf';
 
     if (pdf && method === 'POST') {
       const profile = await loadProfile(workspaceRoot);
@@ -448,6 +455,12 @@ function assertTrustedOrigin(req, port) {
   if (req.headers['sec-fetch-site'] === 'cross-site') {
     throw new WorkspaceError('Cross-site requests are not allowed.', 403);
   }
+}
+
+function requestSlug(req, kind) {
+  const slug = String(req.headers['x-resume-builder-slug'] || '');
+  assertSlug(slug, kind);
+  return slug;
 }
 
 function authorizeRequest(req, apiToken, {

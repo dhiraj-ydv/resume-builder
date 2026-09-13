@@ -225,14 +225,14 @@ async function renderDashboard() {
     const slug = button.dataset.slug;
     if (button.dataset.action === 'delete') {
       if (!confirm(`Delete ${slug}? This cannot be undone.`)) return;
-      await api(`resumes/${slug}`, { method: 'DELETE' });
+      await api('resume', withSlug(slug, { method: 'DELETE' }));
       await renderDashboard();
     }
     if (button.dataset.action === 'pdf') {
       button.disabled = true;
       try {
-        await api(`resumes/${slug}/pdf`, { method: 'POST' });
-        window.location = `/api/resumes/${slug}/pdf`;
+        await api('resume/pdf', withSlug(slug, { method: 'POST' }));
+        window.location = `/api/resumes/${encodeURIComponent(slug)}/pdf`;
       } finally {
         button.disabled = false;
       }
@@ -294,23 +294,23 @@ async function renderSkills() {
     const toggle = event.target.closest('[data-action=toggle-skill]');
     if (toggle) {
       const enabled = toggle.dataset.enabled !== 'true';
-      await api(`skills/${toggle.dataset.slug}/enabled`, {
+      await api('skill/enabled', withSlug(toggle.dataset.slug, {
         method: 'PUT',
         body: JSON.stringify({ enabled }),
-      });
+      }));
       await renderSkills();
       return;
     }
     const remove = event.target.closest('[data-action=delete-skill]');
     if (!remove) return;
     if (!confirm(`Delete skill ${remove.dataset.slug}?`)) return;
-    await api(`skills/${remove.dataset.slug}`, { method: 'DELETE' });
+    await api('skill', withSlug(remove.dataset.slug, { method: 'DELETE' }));
     await renderSkills();
   });
 }
 
 async function renderSkillEditor(slug) {
-  const skill = await api(`skills/${slug}`);
+  const skill = await api('skill', withSlug(slug));
   editorState = { kind: 'skill', slug, markdown: skill.markdown, source: skill.source };
   saveStatus.hidden = skill.source === 'builtin';
   app.innerHTML = `
@@ -328,17 +328,17 @@ async function renderSkillEditor(slug) {
     editor.addEventListener('input', () => {
       editorState.markdown = editor.value;
       queueSave(async () => {
-        await api(`skills/${slug}`, { method: 'PUT', body: JSON.stringify({ markdown: editorState.markdown }) });
+        await api('skill', withSlug(slug, { method: 'PUT', body: JSON.stringify({ markdown: editorState.markdown }) }));
         saveStatus.textContent = 'Saved';
       });
     });
   }
   editor.focus();
   app.querySelector('#toggle-skill').addEventListener('click', async () => {
-    await api(`skills/${slug}/enabled`, {
+    await api('skill/enabled', withSlug(slug, {
       method: 'PUT',
       body: JSON.stringify({ enabled: skill.enabled === false }),
-    });
+    }));
     await renderSkillEditor(slug);
   });
 }
@@ -562,7 +562,7 @@ async function renderEditor(slug, mode) {
   if (editorState?.kind === 'resume' && editorState.resume.slug === slug) {
     if (mode === 'preview') await saveEditor();
   } else {
-    const resume = await api(`resumes/${slug}`);
+    const resume = await api('resume', withSlug(slug));
     editorState = { kind: 'resume', resume };
   }
   paintEditor(mode);
@@ -602,18 +602,18 @@ function paintEditor(mode) {
 
   app.querySelector('#export-pdf').addEventListener('click', async () => {
     await saveEditor();
-    await api(`resumes/${slug}/pdf`, { method: 'POST' });
-    window.location = `/api/resumes/${slug}/pdf`;
+    await api('resume/pdf', withSlug(slug, { method: 'POST' }));
+    window.location = `/api/resumes/${encodeURIComponent(slug)}/pdf`;
   });
 }
 
 async function saveEditor() {
   if (!editorState) return;
   saveStatus.textContent = 'Saving…';
-  const saved = await api(`resumes/${editorState.resume.slug}`, {
+  const saved = await api('resume', withSlug(editorState.resume.slug, {
     method: 'PUT',
     body: JSON.stringify({ markdown: editorState.resume.markdown }),
-  });
+  }));
   editorState.resume = saved;
   saveStatus.textContent = 'Saved';
 }
@@ -640,6 +640,16 @@ async function api(endpoint, options = {}) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
   return payload;
+}
+
+function withSlug(slug, options = {}) {
+  return {
+    ...options,
+    headers: {
+      'X-Resume-Builder-Slug': String(slug),
+      ...(options.headers || {}),
+    },
+  };
 }
 
 function escapeHtml(value) {
