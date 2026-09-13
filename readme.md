@@ -8,8 +8,6 @@ Resume Builder combines a desktop editor, browser UI, CLI, PDF export, and an MC
 
 [Overview](#overview) · [Features](#features) · [How it works](#how-it-works) · [Install](#install) · [CLI](#command-line) · [MCP](#connect-an-ai-agent-with-mcp) · [Privacy](#local-first-by-design) · [Development](#development) · [Releases](#releases-and-updates) · [License](#license)
 
-> **Launch note:** Replace `{{DOWNLOAD_URL}}` with the production website download URL before publishing this content.
-
 ## Overview
 
 Most resume tools lock career information inside a hosted account or proprietary document. Resume Builder keeps the application separate from the data: the app can be upgraded or removed without affecting the user's resume workspace.
@@ -89,7 +87,7 @@ The application never creates a Git repository in the workspace. Version control
 
 ### Windows
 
-[Download Resume Builder for Windows]({{DOWNLOAD_URL}})
+[Download Resume Builder for Windows](https://github.com/exolithelabs/resume-builder/releases)
 
 1. Download the `*-setup.exe` installer and its `.sha256` checksum.
 2. Run the installer for the current Windows user.
