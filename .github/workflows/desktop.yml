@@ -153,6 +153,7 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           WINDOWS_INSTALLER_SIGNED: ${{ needs.build-windows.outputs.signed }}
         run: |
           $installer = Get-Item dist/windows/Resume-Builder-Windows-x64-setup.exe
