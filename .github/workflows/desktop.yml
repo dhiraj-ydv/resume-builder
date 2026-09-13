@@ -130,8 +130,8 @@ jobs:
           if-no-files-found: error
 
   publish-windows-release:
-    name: Publish signed Windows release
-    if: github.ref_type == 'tag' && needs.build-windows.outputs.signed == 'true'
+    name: Publish Windows release
+    if: github.ref_type == 'tag'
     needs: build-windows
     runs-on: windows-latest
     permissions:
@@ -153,14 +153,20 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          WINDOWS_INSTALLER_SIGNED: ${{ needs.build-windows.outputs.signed }}
         run: |
           $installer = Get-Item dist/windows/Resume-Builder-Windows-x64-setup.exe
           $checksum = Get-Item dist/windows/Resume-Builder-Windows-x64-setup.exe.sha256
+          if ($env:WINDOWS_INSTALLER_SIGNED -eq 'true') {
+            $distributionNote = 'The Windows installer is Authenticode-signed. Verify the accompanying SHA-256 checksum before installation.'
+          } else {
+            $distributionNote = 'Warning: the Windows installer is currently unsigned and may show a Microsoft Defender SmartScreen Unknown publisher warning. Verify the accompanying SHA-256 checksum before installation.'
+          }
           gh release view $env:GITHUB_REF_NAME *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $env:GITHUB_REF_NAME $installer.FullName $checksum.FullName --clobber
           } else {
-            gh release create $env:GITHUB_REF_NAME $installer.FullName $checksum.FullName --verify-tag --generate-notes --title "Resume Builder $env:GITHUB_REF_NAME"
+            gh release create $env:GITHUB_REF_NAME $installer.FullName $checksum.FullName --verify-tag --generate-notes --notes $distributionNote --title "Resume Builder $env:GITHUB_REF_NAME"
           }
           $allowedAssets = @(
             'Resume-Builder-Windows-x64-setup.exe',

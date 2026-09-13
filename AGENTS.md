@@ -8,7 +8,7 @@ This repository is the **Resume Builder product**: a Windows direct-download des
 - `src/` is the Node CLI, workspace I/O, HTTP API, PDF export, and desktop launcher.
 - `web/` is the localhost Web UI (browser and Tauri webview).
 - `src-tauri/` is the Tauri desktop shell. Shipping packages bundle Node and the app sources as a self-contained sidecar and load `http://127.0.0.1:4173/`.
-- The signed Windows installer is produced in GitHub Actions (`.github/workflows/desktop.yml`), not locally. Linux is distributed only as a signed Flatpak through the Exolithe Labs Flatpak repository.
+- The Windows installer is produced in GitHub Actions (`.github/workflows/desktop.yml`), not locally. Windows releases are currently unsigned and include a SHA-256 checksum plus GitHub provenance attestation. Linux is distributed only as a signed Flatpak through the Exolithe Labs Flatpak repository.
 - Windows packages are downloaded from the product website. Linux packages come only from the Exolithe Labs Flatpak repository; the old npm-global and direct source-install flows are not distribution channels.
 - `templates/` renders structured JSON to print-ready HTML.
 - User data is **never** stored in this repo. It belongs in the workspace:
@@ -55,7 +55,7 @@ Do not invent employers, dates, metrics, technologies, credentials, or outcomes.
 - End-user installs do not require Node.js or npm
 - Windows is distributed as an NSIS installer
 - The Windows installer adds its install directory to the current user's PATH and removes that entry on uninstall
-- Public Windows installers are Authenticode-signed in GitHub Actions
+- Public Windows installers are currently unsigned, explicitly disclosed as such, and accompanied by a SHA-256 checksum and GitHub provenance attestation
 - Linux is distributed only as the signed `io.github.exolithelabs.ResumeBuilder` Flatpak through the Exolithe Labs Flatpak repository
 - `init` creates a workspace outside this repo
 - First desktop launch creates a default workspace under Documents if none exists

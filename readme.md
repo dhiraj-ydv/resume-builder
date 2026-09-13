@@ -103,7 +103,7 @@ The installer adds Resume Builder to the current user's PATH. Uninstall it from 
 
 Windows packages include the Node sidecar, so users do not need Node.js, npm, Microsoft Store, or another package manager.
 
-Early open-source releases may be unsigned and can display a Windows SmartScreen **Unknown publisher** warning. Verify the published SHA-256 checksum before running an unsigned installer. Code signing will be added when the project has an appropriate signing service.
+Windows releases are currently unsigned and can display a Microsoft Defender SmartScreen **Unknown publisher** warning. Verify the published SHA-256 checksum before running the installer. Code signing may be added later when the project has an appropriate signing service.
 
 ### Linux
 
@@ -237,18 +237,18 @@ User data must never be added to this repository. Use a workspace outside the so
 
 ### Windows releases
 
-The [Windows desktop workflow](.github/workflows/desktop.yml) builds the NSIS installer when a `v*` tag is pushed or the workflow is started manually. Signed tagged builds publish a non-draft GitHub Release containing stable installer and checksum filenames, allowing the README and product website to use permanent latest-release download links.
+The [Windows desktop workflow](.github/workflows/desktop.yml) builds the NSIS installer when a `v*` tag is pushed or the workflow is started manually. Tagged builds publish a non-draft GitHub Release containing stable installer and checksum filenames, allowing the README and product website to use permanent latest-release download links.
 
-Manual workflow runs may produce an unsigned test artifact, but tagged public releases are blocked unless Authenticode signing is configured. Configure both encrypted GitHub Actions secrets using an exportable PFX code-signing certificate:
+Windows releases are currently published unsigned. Every release includes a SHA-256 checksum and a GitHub build-provenance attestation, and the release page explicitly identifies an unsigned installer. If Authenticode signing is added later, configure both encrypted GitHub Actions secrets using an exportable PFX code-signing certificate:
 
 - `WINDOWS_CERTIFICATE`: base64-encoded PFX code-signing certificate.
 - `WINDOWS_CERTIFICATE_PASSWORD`: PFX password.
 
-If both secrets are absent, the workflow may retain an unsigned test artifact but skips Windows release publication. If only one secret is present or the PFX is invalid, the build fails. When both are valid, the certificate is imported only into the ephemeral GitHub-hosted runner and Tauri signs and timestamps the Windows package. Published installers also receive a GitHub build-provenance attestation. Certificate files and private keys must never be committed.
+If both secrets are absent, the workflow publishes the unsigned tagged installer. If only one secret is present or the PFX is invalid, the build fails. When both are valid, the certificate is imported only into the ephemeral GitHub-hosted runner and Tauri signs and timestamps the Windows package. Certificate files and private keys must never be committed.
 
 ### Linux releases
 
-After a tagged Windows release succeeds, the workflow automatically sends the exact release commit and version to `exolithelabs/exolithelabs-flatpak-repo`. That repository verifies the tag, updates its pinned Resume Builder manifest, builds and signs both Linux architectures, and deploys the updated OSTree repository to GitHub Pages.
+After a tagged build succeeds, the workflow automatically sends the exact release commit and version to `exolithelabs/exolithelabs-flatpak-repo`. That repository verifies the tag, updates its pinned Resume Builder manifest, builds and signs both Linux architectures, and deploys the updated OSTree repository to GitHub Pages.
 
 Configure `FLATPAK_REPOSITORY_TOKEN` as a Resume Builder repository secret. It must be a fine-grained token limited to `exolithelabs/exolithelabs-flatpak-repo` with **Contents: read and write** permission so it can create the cross-repository dispatch event. Flatpak signing remains isolated in the Flatpak repository's `FLATPAK_GPG_PRIVATE_KEY` secret.
 
