@@ -109,19 +109,6 @@ Windows releases are currently unsigned and can display a Microsoft Defender Sma
 
 #### Flatpak
 
-Add the Exolithe Labs Flatpak repository first:
-
-[Download the Exolithe Labs Flatpak repository file](https://flatpak.exolithelabs.com/exolithelabs.flatpakrepo)
-
-Or add it from a terminal:
-
-```bash
-flatpak remote-add --if-not-exists exolithelabs \
-  https://flatpak.exolithelabs.com/exolithelabs.flatpakrepo
-```
-
-Then install Resume Builder:
-
 [Download the Resume Builder Flatpak reference](https://flatpak.exolithelabs.com/apps/io.github.exolithelabs.ResumeBuilder.flatpakref)
 
 Or install it from a terminal:
