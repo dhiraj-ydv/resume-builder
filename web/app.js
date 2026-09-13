@@ -40,7 +40,7 @@ settingsBtn.addEventListener('click', (event) => {
 });
 settingsDropdown.addEventListener('click', () => closeSettingsMenu());
 openBrowserBtn.addEventListener('click', async () => {
-  await api('/api/open-browser', {
+  await api('open-browser', {
     method: 'POST',
     body: JSON.stringify({ hash: location.hash }),
   });
@@ -63,7 +63,7 @@ skillForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const name = skillName.value.trim();
   if (!name) return;
-  const skill = await api('/api/skills', { method: 'POST', body: JSON.stringify({ name }) });
+  const skill = await api('skills', { method: 'POST', body: JSON.stringify({ name }) });
   skillDialog.close();
   skillForm.reset();
   location.hash = `#/skills/${skill.slug}`;
@@ -72,7 +72,7 @@ createForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const title = createTitle.value.trim();
   if (!title) return;
-  const resume = await api('/api/resumes', { method: 'POST', body: JSON.stringify({ title }) });
+  const resume = await api('resumes', { method: 'POST', body: JSON.stringify({ title }) });
   createDialog.close();
   createForm.reset();
   location.hash = `#/edit/${resume.slug}`;
@@ -83,7 +83,7 @@ checkForLatestRelease();
 
 async function checkForLatestRelease({ manual = false } = {}) {
   try {
-    const release = await api(`/api/releases/latest${manual ? '?refresh=1' : ''}`);
+    const release = await api(`releases/latest${manual ? '?refresh=1' : ''}`);
     if (!release.available || !release.tagName || !release.url) {
       if (manual) showUpdateCheckStatus(`Resume Builder ${release.currentVersion} is up to date.`);
       return;
@@ -174,7 +174,7 @@ function parseRoute() {
 async function renderDashboard() {
   editorState = null;
   saveStatus.hidden = true;
-  const { resumes } = await api('/api/resumes');
+  const { resumes } = await api('resumes');
 
   app.innerHTML = `
     <section class="hero">
@@ -225,13 +225,13 @@ async function renderDashboard() {
     const slug = button.dataset.slug;
     if (button.dataset.action === 'delete') {
       if (!confirm(`Delete ${slug}? This cannot be undone.`)) return;
-      await api(`/api/resumes/${slug}`, { method: 'DELETE' });
+      await api(`resumes/${slug}`, { method: 'DELETE' });
       await renderDashboard();
     }
     if (button.dataset.action === 'pdf') {
       button.disabled = true;
       try {
-        await api(`/api/resumes/${slug}/pdf`, { method: 'POST' });
+        await api(`resumes/${slug}/pdf`, { method: 'POST' });
         window.location = `/api/resumes/${slug}/pdf`;
       } finally {
         button.disabled = false;
@@ -260,7 +260,7 @@ function listItemHtml(resume) {
 async function renderSkills() {
   editorState = null;
   saveStatus.hidden = true;
-  const { skills } = await api('/api/skills');
+  const { skills } = await api('skills');
   app.innerHTML = `
     <section class="hero">
       <div>
@@ -294,7 +294,7 @@ async function renderSkills() {
     const toggle = event.target.closest('[data-action=toggle-skill]');
     if (toggle) {
       const enabled = toggle.dataset.enabled !== 'true';
-      await api(`/api/skills/${toggle.dataset.slug}/enabled`, {
+      await api(`skills/${toggle.dataset.slug}/enabled`, {
         method: 'PUT',
         body: JSON.stringify({ enabled }),
       });
@@ -304,13 +304,13 @@ async function renderSkills() {
     const remove = event.target.closest('[data-action=delete-skill]');
     if (!remove) return;
     if (!confirm(`Delete skill ${remove.dataset.slug}?`)) return;
-    await api(`/api/skills/${remove.dataset.slug}`, { method: 'DELETE' });
+    await api(`skills/${remove.dataset.slug}`, { method: 'DELETE' });
     await renderSkills();
   });
 }
 
 async function renderSkillEditor(slug) {
-  const skill = await api(`/api/skills/${slug}`);
+  const skill = await api(`skills/${slug}`);
   editorState = { kind: 'skill', slug, markdown: skill.markdown, source: skill.source };
   saveStatus.hidden = skill.source === 'builtin';
   app.innerHTML = `
@@ -328,14 +328,14 @@ async function renderSkillEditor(slug) {
     editor.addEventListener('input', () => {
       editorState.markdown = editor.value;
       queueSave(async () => {
-        await api(`/api/skills/${slug}`, { method: 'PUT', body: JSON.stringify({ markdown: editorState.markdown }) });
+        await api(`skills/${slug}`, { method: 'PUT', body: JSON.stringify({ markdown: editorState.markdown }) });
         saveStatus.textContent = 'Saved';
       });
     });
   }
   editor.focus();
   app.querySelector('#toggle-skill').addEventListener('click', async () => {
-    await api(`/api/skills/${slug}/enabled`, {
+    await api(`skills/${slug}/enabled`, {
       method: 'PUT',
       body: JSON.stringify({ enabled: skill.enabled === false }),
     });
@@ -344,7 +344,7 @@ async function renderSkillEditor(slug) {
 }
 
 async function renderMemory() {
-  const memory = await api('/api/memory');
+  const memory = await api('memory');
   editorState = { kind: 'memory', markdown: memory.markdown };
   saveStatus.hidden = false;
   app.innerHTML = `
@@ -356,7 +356,7 @@ async function renderMemory() {
   editor.addEventListener('input', () => {
     editorState.markdown = editor.value;
     queueSave(async () => {
-      await api('/api/memory', { method: 'PUT', body: JSON.stringify({ markdown: editorState.markdown }) });
+      await api('memory', { method: 'PUT', body: JSON.stringify({ markdown: editorState.markdown }) });
       saveStatus.textContent = 'Saved';
     });
   });
@@ -366,7 +366,7 @@ async function renderMemory() {
 async function renderVault() {
   editorState = null;
   saveStatus.hidden = true;
-  const workspace = await api('/api/workspace');
+  const workspace = await api('workspace');
   const recent = (workspace.recentVaults || []).filter((item) => item && item !== workspace.root);
   app.innerHTML = `
     <section class="doc">
@@ -397,7 +397,7 @@ async function renderVault() {
     event.preventDefault();
     const mode = event.submitter?.dataset.mode || 'switch';
     try {
-      await api('/api/workspace', {
+      await api('workspace', {
         method: 'PUT',
         body: JSON.stringify({
           root: input.value.trim(),
@@ -423,7 +423,7 @@ async function renderVault() {
 async function renderDocs() {
   editorState = null;
   saveStatus.hidden = true;
-  const info = await api('/api/mcp');
+  const info = await api('mcp');
   const snippet = JSON.stringify(info.generic, null, 2);
   app.innerHTML = `
     <article class="docs-page">
@@ -526,7 +526,7 @@ resumes/&lt;slug&gt;/dist/resume.pdf</pre>
 
 async function renderProfileEditor() {
   if (!editorState || editorState.kind !== 'profile') {
-    const profile = await api('/api/profile');
+    const profile = await api('profile');
     editorState = { kind: 'profile', markdown: profile.markdown };
   }
   saveStatus.hidden = false;
@@ -550,7 +550,7 @@ async function renderProfileEditor() {
 async function saveProfileEditor() {
   if (!editorState || editorState.kind !== 'profile') return;
   saveStatus.textContent = 'Saving…';
-  const saved = await api('/api/profile', {
+  const saved = await api('profile', {
     method: 'PUT',
     body: JSON.stringify({ markdown: editorState.markdown }),
   });
@@ -562,7 +562,7 @@ async function renderEditor(slug, mode) {
   if (editorState?.kind === 'resume' && editorState.resume.slug === slug) {
     if (mode === 'preview') await saveEditor();
   } else {
-    const resume = await api(`/api/resumes/${slug}`);
+    const resume = await api(`resumes/${slug}`);
     editorState = { kind: 'resume', resume };
   }
   paintEditor(mode);
@@ -602,7 +602,7 @@ function paintEditor(mode) {
 
   app.querySelector('#export-pdf').addEventListener('click', async () => {
     await saveEditor();
-    await api(`/api/resumes/${slug}/pdf`, { method: 'POST' });
+    await api(`resumes/${slug}/pdf`, { method: 'POST' });
     window.location = `/api/resumes/${slug}/pdf`;
   });
 }
@@ -610,7 +610,7 @@ function paintEditor(mode) {
 async function saveEditor() {
   if (!editorState) return;
   saveStatus.textContent = 'Saving…';
-  const saved = await api(`/api/resumes/${editorState.resume.slug}`, {
+  const saved = await api(`resumes/${editorState.resume.slug}`, {
     method: 'PUT',
     body: JSON.stringify({ markdown: editorState.resume.markdown }),
   });
@@ -627,8 +627,8 @@ function queueSave(fn) {
   }), 400);
 }
 
-async function api(path, options = {}) {
-  const response = await fetch(localApiPath(path), {
+async function api(endpoint, options = {}) {
+  const response = await fetch(`/api/${endpoint}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -640,14 +640,6 @@ async function api(path, options = {}) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
   return payload;
-}
-
-function localApiPath(value) {
-  const url = new URL(String(value), window.location.origin);
-  if (url.origin !== window.location.origin || !url.pathname.startsWith('/api/')) {
-    throw new Error('Refusing a non-local API request.');
-  }
-  return `${url.pathname}${url.search}`;
 }
 
 function escapeHtml(value) {

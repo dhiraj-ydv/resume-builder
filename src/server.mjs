@@ -69,10 +69,12 @@ export function startServer({
     throw new WorkspaceError('RESUME_BUILDER_API_TOKEN must be a 32-128 character URL-safe token.');
   }
   const apiToken = configuredToken || randomBytes(32).toString('base64url');
+  const browserSessionId = randomBytes(32).toString('base64url');
   const state = {
     workspaceRoot,
     launchToken: suppliedLaunchToken || process.env.RESUME_BUILDER_LAUNCH_TOKEN || '',
     apiToken,
+    browserSessionId,
   };
   const server = http.createServer((req, res) => {
     handle(req, res, state, port).catch((error) => {
@@ -123,6 +125,7 @@ async function handle(req, res, state, port) {
     const browserPath = pathname.startsWith('/api/') || pathname.startsWith('/preview/');
     authorizeRequest(req, state.apiToken, {
       allowCookie: browserPath,
+      browserSessionId: state.browserSessionId,
       requireBrowserHeader: browserPath && method !== 'GET' && method !== 'HEAD',
     });
   }
@@ -303,19 +306,19 @@ async function handle(req, res, state, port) {
   }
 
   if (method === 'GET') {
-    return sendStatic(req, res, pathname, requestUrl, state.apiToken);
+    return sendStatic(req, res, pathname, requestUrl, state.apiToken, state.browserSessionId);
   }
 
   throw new WorkspaceError('Not found', 404);
 }
 
-async function sendStatic(req, res, pathname, requestUrl, apiToken) {
+async function sendStatic(req, res, pathname, requestUrl, apiToken, browserSessionId) {
   if (pathname.includes('\\') || pathname.split('/').includes('..')) {
     throw new WorkspaceError('Forbidden', 403);
   }
 
   if (pathname === '/' || pathname === '/index.html') {
-    return sendIndex(req, res, requestUrl, apiToken);
+    return sendIndex(req, res, requestUrl, apiToken, browserSessionId);
   }
 
   const staticName = STATIC_FILES.get(pathname);
@@ -327,7 +330,7 @@ async function sendStatic(req, res, pathname, requestUrl, apiToken) {
   res.end(contents);
 }
 
-async function sendIndex(req, res, requestUrl, apiToken) {
+async function sendIndex(req, res, requestUrl, apiToken, browserSessionId) {
   const suppliedToken = requestUrl.searchParams.get('token');
   if (suppliedToken !== null) {
     if (!tokensMatch(suppliedToken, apiToken)) throw new WorkspaceError('Invalid launch token.', 403);
@@ -338,13 +341,13 @@ async function sendIndex(req, res, requestUrl, apiToken) {
     res.writeHead(302, {
       ...SECURITY_HEADERS,
       Location: `${redirectUrl.pathname}${redirectUrl.search}`,
-      'Set-Cookie': sessionCookie(apiToken),
+      'Set-Cookie': sessionCookie(browserSessionId),
     });
     res.end();
     return;
   }
 
-  if (!tokensMatch(readCookie(req, 'rb_session'), apiToken)) {
+  if (!tokensMatch(readCookie(req, 'rb_session'), browserSessionId)) {
     res.writeHead(401, { ...SECURITY_HEADERS, 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('Resume Builder must be opened from the desktop app or CLI launch URL.');
     return;
@@ -355,7 +358,7 @@ async function sendIndex(req, res, requestUrl, apiToken) {
     ...SECURITY_HEADERS,
     'Content-Security-Policy': APP_CSP,
     'Content-Type': 'text/html; charset=utf-8',
-    'Set-Cookie': sessionCookie(apiToken),
+    'Set-Cookie': sessionCookie(browserSessionId),
   });
   res.end(html);
 }
@@ -447,12 +450,16 @@ function assertTrustedOrigin(req, port) {
   }
 }
 
-function authorizeRequest(req, apiToken, { allowCookie = false, requireBrowserHeader = false } = {}) {
+function authorizeRequest(req, apiToken, {
+  allowCookie = false,
+  browserSessionId = '',
+  requireBrowserHeader = false,
+} = {}) {
   const authorization = String(req.headers.authorization || '');
   const bearer = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
   const headerToken = String(req.headers['x-resume-builder-token'] || bearer);
   if (tokensMatch(headerToken, apiToken)) return;
-  if (allowCookie && tokensMatch(readCookie(req, 'rb_session'), apiToken)) {
+  if (allowCookie && tokensMatch(readCookie(req, 'rb_session'), browserSessionId)) {
     if (requireBrowserHeader && req.headers['x-resume-builder-request'] !== '1') {
       throw new WorkspaceError('Browser request header required.', 403);
     }
@@ -478,6 +485,6 @@ function readCookie(req, name) {
   return '';
 }
 
-function sessionCookie(apiToken) {
-  return `rb_session=${apiToken}; HttpOnly; SameSite=Strict; Path=/`;
+function sessionCookie(browserSessionId) {
+  return `rb_session=${browserSessionId}; HttpOnly; SameSite=Strict; Path=/`;
 }

@@ -115,6 +115,7 @@ test('browser bootstrap exchanges its token for a strict session cookie', async 
     assert.equal(bootstrap.headers.get('location'), '/');
     const cookie = bootstrap.headers.get('set-cookie');
     assert.match(cookie, /rb_session=/);
+    assert.doesNotMatch(cookie, new RegExp(app.apiToken));
     assert.match(cookie, /HttpOnly/i);
     assert.match(cookie, /SameSite=Strict/i);
 
