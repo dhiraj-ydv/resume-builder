@@ -113,3 +113,30 @@ jobs:
           } else {
             gh release create $env:GITHUB_REF_NAME $installer.FullName $checksum.FullName --verify-tag --generate-notes --title "Resume Builder $env:GITHUB_REF_NAME"
           }
+
+  publish-flatpak:
+    name: Request Flatpak publication
+    if: github.ref_type == 'tag'
+    needs: build-windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Dispatch immutable release to the Flatpak repository
+        env:
+          GH_TOKEN: ${{ secrets.FLATPAK_REPOSITORY_TOKEN }}
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "FLATPAK_REPOSITORY_TOKEN is required to publish Linux releases." >&2
+            exit 1
+          fi
+          source_commit=$(git rev-parse HEAD)
+          version=${GITHUB_REF_NAME#v}
+          jq -n \
+            --arg commit "$source_commit" \
+            --arg tag "$GITHUB_REF_NAME" \
+            --arg version "$version" \
+            '{event_type:"resume-builder-release",client_payload:{source_commit:$commit,release_tag:$tag,version:$version}}' | \
+            gh api --method POST \
+              repos/exolithelabs/exolithelabs-flatpak-repo/dispatches \
+              --input -

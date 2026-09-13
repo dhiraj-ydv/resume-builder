@@ -242,6 +242,12 @@ Code signing is optional. With neither signing secret configured, the workflow p
 
 If only one secret is configured, or the PFX is invalid, the workflow fails instead of silently publishing an unexpectedly unsigned build. When both are valid, the certificate is imported only into the ephemeral GitHub-hosted runner and Tauri signs and timestamps the Windows package. Certificate files and private keys must never be committed.
 
+### Linux releases
+
+After a tagged Windows release succeeds, the workflow automatically sends the exact release commit and version to `exolithelabs/exolithelabs-flatpak-repo`. That repository verifies the tag, updates its pinned Resume Builder manifest, builds and signs both Linux architectures, and deploys the updated OSTree repository to GitHub Pages.
+
+Configure `FLATPAK_REPOSITORY_TOKEN` as a Resume Builder repository secret. It must be a fine-grained token limited to `exolithelabs/exolithelabs-flatpak-repo` with **Contents: read and write** permission so it can create the cross-repository dispatch event. Flatpak signing remains isolated in the Flatpak repository's `FLATPAK_GPG_PRIVATE_KEY` secret.
+
 ### Version management
 
 The release version is synchronized across npm, Tauri, Cargo, and their lockfiles:

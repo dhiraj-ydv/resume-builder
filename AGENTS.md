@@ -64,6 +64,7 @@ Do not invent employers, dates, metrics, technologies, credentials, or outcomes.
 - While running, MCP is at `http://127.0.0.1:4173/mcp` for external agents
 - Website download packages come from the Desktop downloads GitHub Actions workflow
 - Tagged Windows builds publish a GitHub Release, and the app checks that public release feed for newer-version notifications
+- A successful tagged release dispatches its immutable commit and version to the shared Flatpak repository for automatic Linux publication
 - Release tags and npm/Tauri/Cargo versions must match; use `npm run version:set -- <semver>`
 - Creating, editing, previewing, and exporting a resume works without touching app source
 - PDFs print cleanly to A4
