@@ -107,9 +107,39 @@ Early open-source releases may be unsigned and can display a Windows SmartScreen
 
 ### Linux
 
-Linux is supported through an open-source build. Prebuilt `.deb`, AppImage, Flatpak, and store packages are not distributed.
+#### Flatpak
 
-Install Node.js 20+, Rust stable, and the Tauri system dependencies for your distribution. On Ubuntu or Debian:
+Add the Exolithe Labs Flatpak repository first:
+
+[Download the Exolithe Labs Flatpak repository file](https://flatpak.exolithelabs.com/exolithelabs.flatpakrepo)
+
+Or add it from a terminal:
+
+```bash
+flatpak remote-add --if-not-exists exolithelabs \
+  https://flatpak.exolithelabs.com/exolithelabs.flatpakrepo
+```
+
+Then install Resume Builder:
+
+[Download the Resume Builder Flatpak reference](https://flatpak.exolithelabs.com/apps/io.github.exolithelabs.ResumeBuilder.flatpakref)
+
+Or install it from a terminal:
+
+```bash
+flatpak install --user --from \
+  https://flatpak.exolithelabs.com/apps/io.github.exolithelabs.ResumeBuilder.flatpakref
+```
+
+Run it with:
+
+```bash
+flatpak run io.github.exolithelabs.ResumeBuilder
+```
+
+#### Build from source
+
+If you prefer to build the open-source project yourself, install Node.js 20+, Rust stable, and the Tauri system dependencies for your distribution. On Ubuntu or Debian:
 
 ```bash
 sudo apt update
@@ -300,7 +330,7 @@ No. Application files and workspace data are deliberately stored separately.
 
 ### Where are Linux packages?
 
-Linux is distributed as source for the initial open-source launch. Build and install it with `bash scripts/install-linux.sh`.
+Linux users can install the signed Flatpak from the [Exolithe Labs Flatpak repository](https://flatpak.exolithelabs.com/apps/io.github.exolithelabs.ResumeBuilder.flatpakref), or build and install from source with `bash scripts/install-linux.sh`.
 
 ## Contributing
 
